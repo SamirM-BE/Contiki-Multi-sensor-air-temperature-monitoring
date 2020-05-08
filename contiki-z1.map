@@ -7,7 +7,7 @@ contiki-z1.a(leds.o)          obj_z1/contiki-z1-main.o (leds_init)
 contiki-z1.a(watchdog.o)      obj_z1/contiki-z1-main.o (watchdog_start)
 contiki-z1.a(xmem.o)          obj_z1/contiki-z1-main.o (xmem_init)
 contiki-z1.a(spi.o)           contiki-z1.a(xmem.o) (spi_init)
-contiki-z1.a(cc2420.o)        sensorNode.co (cc2420_last_rssi)
+contiki-z1.a(cc2420.o)        computeNode.co (cc2420_last_rssi)
 contiki-z1.a(cc2420-arch.o)   contiki-z1.a(cc2420.o) (cc2420_arch_init)
 contiki-z1.a(node-id.o)       obj_z1/contiki-z1-main.o (node_id_restore)
 contiki-z1.a(sensors.o)       contiki-z1.a(contiki-z1-plat) (sensors_process)
@@ -28,17 +28,17 @@ contiki-z1.a(process.o)       contiki-z1.a(ctimer.o) (process_current)
 contiki-z1.a(rtimer.o)        obj_z1/contiki-z1-main.o (rtimer_init)
 contiki-z1.a(timer.o)         contiki-z1.a(adxl345.o) (timer_set)
 contiki-z1.a(serial-line.o)   obj_z1/contiki-z1-main.o (serial_line_input_byte)
-contiki-z1.a(list.o)          sensorNode.co (list_init)
-contiki-z1.a(memb.o)          sensorNode.co (memb_init)
+contiki-z1.a(list.o)          computeNode.co (list_init)
+contiki-z1.a(memb.o)          computeNode.co (memb_init)
 contiki-z1.a(random.o)        obj_z1/contiki-z1-main.o (random_init)
 contiki-z1.a(ringbuf.o)       contiki-z1.a(serial-line.o) (ringbuf_init)
-contiki-z1.a(broadcast.o)     sensorNode.co (broadcast_open)
+contiki-z1.a(broadcast.o)     computeNode.co (broadcast_open)
 contiki-z1.a(channel.o)       contiki-z1.a(broadcast.o) (channel_set_attributes)
 contiki-z1.a(rime.o)          obj_z1/contiki-z1-main.o (rime_driver)
-contiki-z1.a(runicast.o)      sensorNode.co (runicast_open)
+contiki-z1.a(runicast.o)      computeNode.co (runicast_open)
 contiki-z1.a(stunicast.o)     contiki-z1.a(runicast.o) (stunicast_open)
 contiki-z1.a(unicast.o)       contiki-z1.a(stunicast.o) (unicast_open)
-contiki-z1.a(linkaddr.o)      sensorNode.co (linkaddr_copy)
+contiki-z1.a(linkaddr.o)      computeNode.co (linkaddr_copy)
 contiki-z1.a(packetbuf.o)     contiki-z1.a(cc2420.o) (packetbuf_set_datalen)
 contiki-z1.a(queuebuf.o)      contiki-z1.a(rime.o) (queuebuf_init)
 contiki-z1.a(csma.o)          obj_z1/contiki-z1-main.o (csma_driver)
@@ -71,11 +71,11 @@ contiki-z1.a(frame802154.o)   contiki-z1.a(framer-802154.o) (frame802154_get_pan
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/libgcc.a(_udivmod16.o)
                               /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/libgcc.a(_divmod16.o) (__ext_udivmod16)
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(printf.o)
-                              sensorNode.co (printf)
+                              computeNode.co (printf)
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(vuprintf.o)
                               /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(printf.o) (vuprintf)
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(puts.o)
-                              sensorNode.co (puts)
+                              computeNode.co (puts)
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(rand.o)
                               contiki-z1.a(random.o) (rand)
 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/../../../../msp430/lib/mcpu-430x/mmpy-16/msr20/mc20/libc.a(strncmp.o)
@@ -116,8 +116,8 @@ energest_total_time
                     0x30              contiki-z1.a(energest.o)
 cc2420_last_rssi    0x1               contiki-z1.a(cc2420.o)
 accm_int2_cb        0x4               contiki-z1.a(adxl345.o)
-x                   0x1               sensorNode.co
-n                   0x2               sensorNode.co
+x                   0x1               computeNode.co
+n                   0x2               computeNode.co
 energest_total_count
                     0x2               contiki-z1.a(energest.o)
 cc2420_sfd_start_time
@@ -126,7 +126,7 @@ cc2420_time_of_departure
                     0x2               contiki-z1.a(cc2420.o)
 cc2420_time_of_arrival
                     0x2               contiki-z1.a(cc2420.o)
-hello               0x80              sensorNode.co
+hello               0x8               computeNode.co
 energest_current_mode
                     0xc               contiki-z1.a(energest.o)
 packetbuf_addrs     0x8               contiki-z1.a(packetbuf.o)
@@ -148,7 +148,7 @@ msp430_dco_required
 receive_data        0x1               contiki-z1.a(i2cmaster.o)
 cc2420_sfd_counter  0x1               contiki-z1.a(cc2420.o)
 rx_buf              0x2               contiki-z1.a(i2cmaster.o)
-y                   0x1               sensorNode.co
+y                   0x1               computeNode.co
 node_mac            0x8               contiki-z1.a(node-id.o)
 transmit_data2      0x1               contiki-z1.a(i2cmaster.o)
 energest_current_time
@@ -166,11 +166,11 @@ Discarded input sections
  .data          0x00000000        0x0 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/crt0ivtbl32.o
  .bss           0x00000000        0x0 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/crt0ivtbl32.o
  .text.crt0     0x00000000        0x0 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/crt0ivtbl32.o
- .text          0x00000000        0x0 sensorNode.co
- .data          0x00000000        0x0 sensorNode.co
- .bss           0x00000000        0x0 sensorNode.co
- .data.vals     0x00000000       0x3c sensorNode.co
- .data.minutes  0x00000000       0x3c sensorNode.co
+ .text          0x00000000        0x0 computeNode.co
+ .data          0x00000000        0x0 computeNode.co
+ .bss           0x00000000        0x0 computeNode.co
+ .data.vals     0x00000000       0x3c computeNode.co
+ .data.minutes  0x00000000       0x3c computeNode.co
  .text          0x00000000        0x0 obj_z1/contiki-z1-main.o
  .data          0x00000000        0x0 obj_z1/contiki-z1-main.o
  .bss           0x00000000        0x0 obj_z1/contiki-z1-main.o
@@ -620,7 +620,7 @@ Linker script and memory map
 LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/crt0ivtbl32.o
                 0x00000041                __P1SEL2 = 0x41
                 0x00000045                __P5SEL2 = 0x45
-LOAD sensorNode.co
+LOAD computeNode.co
 LOAD obj_z1/contiki-z1-main.o
 LOAD contiki-z1.a
 LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/libgcc.a
@@ -1077,15 +1077,15 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00004338                irq_p2
                 0x00004338                __isr_19
  .any.text.timedout_runicast
-                0x000043ae       0x1a sensorNode.co
+                0x000043ae       0x1a computeNode.co
  .any.text.sent_runicast
-                0x000043c8       0x1a sensorNode.co
+                0x000043c8       0x1a computeNode.co
  .any.text.process_thread_blink_process
-                0x000043e2       0xf6 sensorNode.co
+                0x000043e2       0xf6 computeNode.co
  .any.text.recv_runicast
-                0x000044d8       0x9a sensorNode.co
+                0x000044d8       0x9a computeNode.co
  .any.text.broadcast_recv
-                0x00004572       0x4a sensorNode.co
+                0x00004572       0x4a computeNode.co
  .any.text.init_platform
                 0x000045bc        0xc contiki-z1.a(contiki-z1-plat)
                 0x000045bc                init_platform
@@ -1847,23 +1847,23 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00008584                . = ALIGN (0x2)
  *(.rodata .rodata.* .gnu.linkonce.r.*)
  .rodata.timedout_runicast
-                0x00008584       0x46 sensorNode.co
+                0x00008584       0x46 computeNode.co
  .rodata.sent_runicast
-                0x000085ca       0x34 sensorNode.co
+                0x000085ca       0x34 computeNode.co
  .rodata.process_thread_blink_process
-                0x000085fe       0x67 sensorNode.co
+                0x000085fe       0x67 computeNode.co
  .rodata.recv_runicast
-                0x00008665       0x6c sensorNode.co
+                0x00008665       0x6c computeNode.co
  .rodata.broadcast_recv
-                0x000086d1       0x63 sensorNode.co
+                0x000086d1       0x63 computeNode.co
  .rodata.autostart_processes
-                0x00008734        0x4 sensorNode.co
+                0x00008734        0x4 computeNode.co
                 0x00008734                autostart_processes
- .rodata        0x00008738        0xe sensorNode.co
+ .rodata        0x00008738        0xe computeNode.co
  .rodata.broadcast_call
-                0x00008746        0x8 sensorNode.co
+                0x00008746        0x8 computeNode.co
  .rodata.runicast_callbacks
-                0x0000874e        0xc sensorNode.co
+                0x0000874e        0xc computeNode.co
  .rodata        0x0000875a       0xe1 obj_z1/contiki-z1-main.o
  *fill*         0x0000883b        0x1 00
  .rodata.get_value
@@ -1958,10 +1958,10 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00001100                __data_start = .
  *(.data .data.* .gnu.linkonce.d.*)
  .data.blink_process
-                0x00001100        0xc sensorNode.co
+                0x00001100        0xc computeNode.co
                 0x00001100                blink_process
  .data.history_mem
-                0x0000110c        0x8 sensorNode.co
+                0x0000110c        0x8 computeNode.co
  .data.cur_break
                 0x00001114        0x2 contiki-z1.a(msp430.o)
  .data.cc2420_process
@@ -2011,21 +2011,21 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00008a74                __data_load_start = LOADADDR (.data)
                 0x000000ae                __data_size = SIZEOF (.data)
 
-.bss            0x000011ae      0xbd2 load address 0x00008b22
+.bss            0x000011ae      0xb5a load address 0x00008b22
                 0x000011ae                __bss_start = .
  *(.bss .bss.*)
  .bss.broadcast
-                0x000011ae        0xc sensorNode.co
- .bss.runicast  0x000011ba       0x30 sensorNode.co
- .bss.et.3800   0x000011ea        0xc sensorNode.co
+                0x000011ae        0xc computeNode.co
+ .bss.runicast  0x000011ba       0x30 computeNode.co
+ .bss.et.3812   0x000011ea        0xc computeNode.co
  .bss.history_table_list
-                0x000011f6        0x2 sensorNode.co
- .bss.rss_val   0x000011f8        0x1 sensorNode.co
+                0x000011f6        0x2 computeNode.co
+ .bss.rss_val   0x000011f8        0x1 computeNode.co
  .bss.history_mem_memb_count
-                0x000011f9        0x4 sensorNode.co
+                0x000011f9        0x4 computeNode.co
  *fill*         0x000011fd        0x1 00
  .bss.history_mem_memb_mem
-                0x000011fe       0x18 sensorNode.co
+                0x000011fe       0x18 computeNode.co
  .bss.irq_energest.3892
                 0x00001216        0x4 obj_z1/contiki-z1-main.o
  .bss.leds      0x0000121a        0x1 contiki-z1.a(leds.o)
@@ -2194,73 +2194,73 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00001ba6       0x80 contiki-z1.a(mac-sequence.o)
  *(.near.bss .near.bss.*)
  *(COMMON)
- COMMON         0x00001c26       0x85 sensorNode.co
+ COMMON         0x00001c26        0xd computeNode.co
                 0x00001c26                x
                 0x00001c28                n
                 0x00001c2a                hello
-                0x00001caa                y
- *fill*         0x00001cab        0x1 00
- COMMON         0x00001cac        0x2 contiki-z1.a(msp430.o)
-                0x00001cac                msp430_dco_required
- COMMON         0x00001cae       0x10 contiki-z1.a(cc2420.o)
-                0x00001cae                cc2420_last_rssi
-                0x00001cb0                cc2420_sfd_start_time
-                0x00001cb2                cc2420_time_of_departure
-                0x00001cb4                cc2420_time_of_arrival
-                0x00001cb6                cc2420_last_correlation
-                0x00001cb8                cc2420_authority_level_of_sender
-                0x00001cba                cc2420_sfd_counter
-                0x00001cbc                cc2420_sfd_end_time
- COMMON         0x00001cbe        0x8 contiki-z1.a(node-id.o)
-                0x00001cbe                node_mac
- COMMON         0x00001cc6        0x1 contiki-z1.a(sensors.o)
-                0x00001cc6                sensors_event
- COMMON         0x00001cc7        0x4 contiki-z1.a(z1-sensors.o)
-                0x00001cc7                sensors_flags
- *fill*         0x00001ccb        0x1 00
- COMMON         0x00001ccc        0x8 contiki-z1.a(adxl345.o)
-                0x00001ccc                accm_int2_cb
-                0x00001cd0                accm_int1_cb
- COMMON         0x00001cd4       0x56 contiki-z1.a(energest.o)
-                0x00001cd4                energest_total_time
-                0x00001d04                energest_total_count
-                0x00001d06                energest_current_mode
-                0x00001d12                energest_current_time
- COMMON         0x00001d2a        0x1 contiki-z1.a(process.o)
-                0x00001d2a                process_maxevents
- COMMON         0x00001d2b        0x1 contiki-z1.a(serial-line.o)
-                0x00001d2b                serial_line_event_message
- COMMON         0x00001d2c        0x2 contiki-z1.a(linkaddr.o)
-                0x00001d2c                linkaddr_node_addr
- COMMON         0x00001d2e       0x3c contiki-z1.a(packetbuf.o)
-                0x00001d2e                packetbuf_addrs
-                0x00001d36                packetbuf_attrs
- COMMON         0x00001d6a        0xe contiki-z1.a(i2cmaster.o)
-                0x00001d6a                transmit_data1
-                0x00001d6b                rx_byte_ctr
-                0x00001d6c                tx_buf_ptr
-                0x00001d6e                tx_byte_ctr
-                0x00001d70                i
-                0x00001d72                receive_data
-                0x00001d73                rx_buf
-                0x00001d75                transmit_data2
-                0x00001d76                rx_buf_ptr
- COMMON         0x00001d78        0x8 contiki-z1.a(compower.o)
-                0x00001d78                compower_idle_activity
-                0x00001d80                . = ALIGN (0x2)
-                0x00001d80                __bss_end = .
-                0x00000bd2                __bss_size = SIZEOF (.bss)
+                0x00001c32                y
+ *fill*         0x00001c33        0x1 00
+ COMMON         0x00001c34        0x2 contiki-z1.a(msp430.o)
+                0x00001c34                msp430_dco_required
+ COMMON         0x00001c36       0x10 contiki-z1.a(cc2420.o)
+                0x00001c36                cc2420_last_rssi
+                0x00001c38                cc2420_sfd_start_time
+                0x00001c3a                cc2420_time_of_departure
+                0x00001c3c                cc2420_time_of_arrival
+                0x00001c3e                cc2420_last_correlation
+                0x00001c40                cc2420_authority_level_of_sender
+                0x00001c42                cc2420_sfd_counter
+                0x00001c44                cc2420_sfd_end_time
+ COMMON         0x00001c46        0x8 contiki-z1.a(node-id.o)
+                0x00001c46                node_mac
+ COMMON         0x00001c4e        0x1 contiki-z1.a(sensors.o)
+                0x00001c4e                sensors_event
+ COMMON         0x00001c4f        0x4 contiki-z1.a(z1-sensors.o)
+                0x00001c4f                sensors_flags
+ *fill*         0x00001c53        0x1 00
+ COMMON         0x00001c54        0x8 contiki-z1.a(adxl345.o)
+                0x00001c54                accm_int2_cb
+                0x00001c58                accm_int1_cb
+ COMMON         0x00001c5c       0x56 contiki-z1.a(energest.o)
+                0x00001c5c                energest_total_time
+                0x00001c8c                energest_total_count
+                0x00001c8e                energest_current_mode
+                0x00001c9a                energest_current_time
+ COMMON         0x00001cb2        0x1 contiki-z1.a(process.o)
+                0x00001cb2                process_maxevents
+ COMMON         0x00001cb3        0x1 contiki-z1.a(serial-line.o)
+                0x00001cb3                serial_line_event_message
+ COMMON         0x00001cb4        0x2 contiki-z1.a(linkaddr.o)
+                0x00001cb4                linkaddr_node_addr
+ COMMON         0x00001cb6       0x3c contiki-z1.a(packetbuf.o)
+                0x00001cb6                packetbuf_addrs
+                0x00001cbe                packetbuf_attrs
+ COMMON         0x00001cf2        0xe contiki-z1.a(i2cmaster.o)
+                0x00001cf2                transmit_data1
+                0x00001cf3                rx_byte_ctr
+                0x00001cf4                tx_buf_ptr
+                0x00001cf6                tx_byte_ctr
+                0x00001cf8                i
+                0x00001cfa                receive_data
+                0x00001cfb                rx_buf
+                0x00001cfd                transmit_data2
+                0x00001cfe                rx_buf_ptr
+ COMMON         0x00001d00        0x8 contiki-z1.a(compower.o)
+                0x00001d00                compower_idle_activity
+                0x00001d08                . = ALIGN (0x2)
+                0x00001d08                __bss_end = .
+                0x00000b5a                __bss_size = SIZEOF (.bss)
 
-.noinit         0x00001d80        0x2 load address 0x00008b22
-                0x00001d80                . = ALIGN (0x2)
-                0x00001d80                __noinit_start = .
+.noinit         0x00001d08        0x2 load address 0x00008b22
+                0x00001d08                . = ALIGN (0x2)
+                0x00001d08                __noinit_start = .
  *(.noinit .noinit.*)
- .noinit.crt0   0x00001d80        0x2 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/libcrt0.a(__watchdog_support.o)
-                0x00001d80                __wdt_clear_value
-                0x00001d82                . = ALIGN (0x2)
-                0x00001d82                __noinit_end = .
-                0x00001d82                . = ALIGN (0x2)
-                0x00001d82                _end = .
+ .noinit.crt0   0x00001d08        0x2 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/libcrt0.a(__watchdog_support.o)
+                0x00001d08                __wdt_clear_value
+                0x00001d0a                . = ALIGN (0x2)
+                0x00001d0a                __noinit_end = .
+                0x00001d0a                . = ALIGN (0x2)
+                0x00001d0a                _end = .
 
 .infomem        0x00001000        0x0
                 0x00001000                . = ALIGN (0x2)
@@ -2331,7 +2331,7 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
 
 .stab           0x00000000    0x1cb3c
  *(.stab)
- .stab          0x00000000     0x16bc sensorNode.co
+ .stab          0x00000000     0x16bc computeNode.co
  .stab          0x000016bc     0x1044 obj_z1/contiki-z1-main.o
                                0x17f4 (size before relaxing)
  .stab          0x00002700      0x234 contiki-z1.a(contiki-z1-plat)
@@ -2445,9 +2445,9 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
  .stab          0x0001b9c0     0x117c contiki-z1.a(frame802154.o)
                                0x1980 (size before relaxing)
 
-.stabstr        0x00000000    0x1668e
+.stabstr        0x00000000    0x16663
  *(.stabstr)
- .stabstr       0x00000000    0x1668e sensorNode.co
+ .stabstr       0x00000000    0x16663 computeNode.co
 
 .stab.excl
  *(.stab.excl)
@@ -2463,7 +2463,7 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
 
 .comment        0x00000000       0x30
  *(.comment)
- .comment       0x00000000       0x30 sensorNode.co
+ .comment       0x00000000       0x30 computeNode.co
                                  0x31 (size before relaxing)
  .comment       0x00000000       0x31 obj_z1/contiki-z1-main.o
  .comment       0x00000000       0x31 contiki-z1.a(contiki-z1-plat)
@@ -2702,14 +2702,14 @@ LOAD /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/
                 0x00003100                PROVIDE (__stack, (ORIGIN (ram) + 0x2000))
                 0x00008a74                __data_start_rom = _etext
                 0x00008b22                __data_end_rom = (_etext + SIZEOF (.data))
-OUTPUT(sensorNode.z1 elf32-msp430)
+OUTPUT(computeNode.z1 elf32-msp430)
 
 .gnu.attributes
                 0x00000000       0x11
  .gnu.attributes
                 0x00000000       0x11 /usr/local/msp430/bin/../lib/gcc/msp430/4.7.0/mcpu-430x/mmpy-16/msr20/mc20/crt0ivtbl32.o
  .gnu.attributes
-                0x00000011       0x11 sensorNode.co
+                0x00000011       0x11 computeNode.co
  .gnu.attributes
                 0x00000022       0x11 obj_z1/contiki-z1-main.o
  .gnu.attributes

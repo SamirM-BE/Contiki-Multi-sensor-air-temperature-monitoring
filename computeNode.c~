@@ -17,7 +17,7 @@
 PROCESS(blink_process, "blink example");
 AUTOSTART_PROCESSES( & blink_process);
 
-/*----------------------------------runicast section-----------------------------------------*/
+/*----------------------------------runicast initialization section-----------------------------------------*/
 /* OPTIONAL: Sender history.
  * Detects duplicate callbacks at receiving nodes.
  * Duplicates appear when ack messages are lost. */
@@ -29,6 +29,8 @@ struct history_entry {
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 
+/*-------------------------------end of section runicast initilization----------------------------------------*/
+
 /*-------------------------------section for packet message structure definition and initialization---------------------------------*/
 
 //Représente un paquet unicast, le contenu est encore à déterminer
@@ -37,7 +39,8 @@ struct unicastPacket
 {
 	signed char rss;
 	char *msg;
-	double slope;
+        int min[30];
+        int valSensor[30];
 };
 typedef struct unicastPacket ucPacket;
 
@@ -46,13 +49,43 @@ int n;
 uint8_t x; 
 uint8_t y; 
 ucPacket hello;
-
-//Fake vals des capteurs ///TODO : générer des nb random
-int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
-int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
-
+static double treshHold = 2.0;
 
 /*---------------------------end of section for packet message structure definition and initialization-------------------------------------*/
+
+
+/*----------------------------section related to the computation of sensor data---------------------*/
+
+//This function returns 1 if the computed slope is above the treshhold, otherwise, it returns 0
+static int leastSquare(int minutes[], int vals[])
+{
+    double sumx=0,sumx2=0,sumy=0,sumyx=0,a;
+    int i;
+    int n = 30;
+	
+    for(i=0; i<n; i++)
+    {
+        sumx=sumx+minutes[i];
+        sumx2=sumx2+minutes[i]*minutes[i];
+        sumy=sumy+vals[i];
+        sumyx=sumyx+vals[i]*minutes[i];
+    }
+    a=(n*sumyx-sumx*sumy)/(n*sumx2-sumx*sumx);
+
+    if(a > treshHold){
+       return 1;
+     }
+
+     int proposal_value = (random_val % max_val) + min_val;
+
+     return 0;
+}
+
+/*---------------------------end fo section related to the computation of sensor data------------------*/
+
+
+/*--------------------------Section runicast----------------------------------------------------*/
+
 
 
 static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno)
@@ -108,27 +141,6 @@ static struct runicast_conn runicast;
 /*----------------------------end of runicast section-----------------------------------------------*/
 
 
-/*----------------------------section related to the computation of sensor data---------------------*/
-
-//Retourne la pente obtenue àpd de la least square method
-static double leastSquare(int minutes[], int vals[])
-{
-    double sumx=0,sumx2=0,sumy=0,sumyx=0,a;
-    int i;
-    int n = 30;
-	
-    for(i=0; i<n; i++)
-    {
-        sumx=sumx+minutes[i];
-        sumx2=sumx2+minutes[i]*minutes[i];
-        sumy=sumy+vals[i];
-        sumyx=sumyx+vals[i]*minutes[i];
-    }
-    a=(n*sumyx-sumx*sumy)/(n*sumx2-sumx*sumx);
-	return a;
-}
-
-/*---------------------------end fo section related to the computation of sensor data------------------*/
 
 /*----------------------------------------section broadcast for network discovery--------------------------------*/
 
@@ -204,30 +216,15 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     
 
-    /*--------section for unicast message sending---------------*/
-
-    ///Envoi d'un paquet unicast contenant le message "hello", le rssi et la pente obtenue par la méthode des moindres carrés.///
-    //packetbuf_copyfrom(&hello, sizeof(hello));
-    //recv.u8[0] = x; //x et y ont été récupéré dans la fonction broadcast_recv et
-    //recv.u8[1] = y; //correspondent à l'adresse d'un noeud ayant envoyé un paquet broadcast
-
-    //if the address of reception is the same as the source address it's a loop so we don't waste time to send the packet
-    //if (!linkaddr_cmp(&recv,&linkaddr_node_addr)) { //linkaddr_node_addr contains the RIME address of the node
-      //packetbuf_copyfrom(&hello, sizeof(hello));
-      //unicast_send(&uc,&recv);
-    //}
-
-     /*-----end of section for unicast message sending----------*/
-
-    
-
-
    /*------section for runicast message sending-----------*/
 
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
+      
+      //if the thresshold is exceeded, we send the OPEN VALVE message. 
+      
 
-      packetbuf_copyfrom("Hello", 5);
+      packetbuf_copyfrom("OPEN VALVE", 5);
       recv.u8[0] = 1;
       recv.u8[1] = 0;
 

@@ -38,9 +38,8 @@ struct unicastPacket
 {
 	signed char rss;
 	char *msg;
-	double slope;
-        int min[30];
-        int valSensor[30];
+        int   min; //the minute corresponding ot the value sensor
+        int   valSensor; // tab of valSensor
 };
 typedef struct unicastPacket ucPacket;
 
@@ -49,22 +48,44 @@ int n;
 uint8_t x; 
 uint8_t y; 
 ucPacket hello;
+//static int *tmp = malloc(sizeof(int)*30);
+//hello.min = (int *) malloc(sizeof(int)*30);
+//hello.valSensor = (int *) malloc(sizeof(int)*30);
 
 //Fake vals des capteurs ///TODO : générer des nb random
 static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
 static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
 
+static int clock = 1;
+
+ 
+
 
 /*---------------------------Section destined to send data to computational node-----------------------------------*/
 
-static void generate_data(){
+
+static void generate_random_data(){
   //we fill the hello packet with the value stored in the array
-  int i;
-  for(i=0; i < 30 ; i++){
-    hello.min[i]= minutes[i];
-    hello.valSensor[i]= vals[i];
-  }     
+
+  //si on a finit de mesurer pendant 30 min, on remet le i à zéro
+  
+  //here we generate a random value between 1 and 100
+  
+  int max_val = 100;
+  int min_val = 1;
+  int random_val = random_rand();
+
+   if(random_val < 0)
+ {
+   random_val *= -1;
+ }
+ 
+  int proposal_value = (random_val % max_val) + min_val;
+  hello.min = clock;
+  hello.valSensor = proposal_value;
 }
+
+
 
 
 /*---------------------------End of section destined to send data to computational node---------------------------*/
@@ -106,11 +127,16 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 
   //we print all the value of the array just to be sure
   
-   int x;
-   for(x=0;x<30; x++){
+   
 
-  printf("value of received packet : %d\n", *((int *) packetbuf_dataptr()+x));
-  }
+    struct unicastPacket *msg;
+
+  /* Grab the pointer to the incoming data. */
+  msg = packetbuf_dataptr();
+   
+
+  printf("value of received packet :%d\n", msg->min);
+  
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
@@ -191,7 +217,17 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     hello.msg = malloc(5);
     hello.msg = "hello";
-    generate_data();
+    generate_random_data();
+
+    //the clock is used to tell to the receiver to which time corresponds the sensor value it receives
+    clock++;
+
+    if(clock == 31){
+      clock = 1;
+    }
+
+
+  
 
     /*---------section to broadcast the discovery message--------*/
 
@@ -214,7 +250,12 @@ PROCESS_THREAD(blink_process, ev, data) {
       linkaddr_t recv;
 
 
-      packetbuf_copyfrom(hello.min, sizeof(hello.min));
+      //we'll send the first element of the structure
+
+
+
+      //packetbuf_copyfrom( &hello, sizeof(struct unicastPacket*)*50);
+      packetbuf_copyfrom( &hello, sizeof(hello));
       recv.u8[0] = 1;
       recv.u8[1] = 0;
 

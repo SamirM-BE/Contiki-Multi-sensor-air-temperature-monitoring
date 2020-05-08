@@ -125,38 +125,6 @@ static struct broadcast_conn broadcast;
 
 /*------------------------------end of boradcast section for network discovery--------------------------------*/
 
-/*------------------------------section for unicast exchange--------------------------------------------------*/
-
-//Fonction appelée quand un paquet unicast a été reçu
-static void recv_uc(struct unicast_conn * c, const linkaddr_t * from) {
-	
-	//On récupère le paquet reçu
-	ucPacket *rcvd = packetbuf_dataptr();
-	printf("Unicast message received from %d.%d in Sensor Node : %s\n",from -> u8[0], from -> u8[1], rcvd->msg);
-	
-	double slope = rcvd->slope;//==> FAIRE QQ CHOSE DE LA PENTE
-}
-
-//Fonction appelée quand un paquet unicast a été envoyé
-static void sent_uc(struct unicast_conn * c, int status, int num_tx) {
-	const linkaddr_t * dest = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
-	if (linkaddr_cmp(dest, & linkaddr_null)) { // This function compares two Rime addresses and returns the result of the comparison. The function acts like the '==' operator and returns non-zero if the addresses are the same, and zero if the addresses are different.
-		return; // This variable linkaddr_null contains the null Rime address. The null address is used in route tables to indicate that the table entry is unused. Nodes with no configured address  has the null address. Nodes with their node address set to the null address will have problems communicating with other nodes.
-	}
-	printf("Unicast message sent to %d.%d from Sensor Node: status %d num_tx %d\n",
-    dest->u8[0], dest->u8[1], status, num_tx);
-}
-
-
-
-static const struct unicast_callbacks unicast_callbacks = {
-  recv_uc,
-  sent_uc
-};
-static struct unicast_conn uc;
-
-/*----------------------------------------end of section for unicast sechange-----------------------------------------*/
-
 //-----------------------------------------------------------------
 PROCESS_THREAD(blink_process, ev, data) {
 
@@ -166,7 +134,6 @@ PROCESS_THREAD(blink_process, ev, data) {
 /*------section to open socket connection-------*/
 
   broadcast_open(&broadcast, 129, &broadcast_call);
-  unicast_open(&uc, 146, &unicast_callbacks);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
 /*----end of section to open socket conenction--*/
@@ -182,10 +149,11 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     /*--------------timer handling section----------------*/ 
 	
-	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
-    static struct etimer et;
-    etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
+	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)
+	
+    static struct etimer etBroadCast;
+    etimer_set(&etBroadCast,10*CLOCK_SECOND); //timer d'une seconde
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadCast)); //attend que la seconde expire
 
     /*------------end of time handling section------------*/
 
@@ -216,7 +184,6 @@ PROCESS_THREAD(blink_process, ev, data) {
     //}
 
      /*-----end of section for unicast message sending----------*/
-
     
 
 
@@ -243,3 +210,5 @@ PROCESS_THREAD(blink_process, ev, data) {
 
 PROCESS_END();
 }
+
+

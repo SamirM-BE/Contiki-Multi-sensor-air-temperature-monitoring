@@ -4,7 +4,7 @@
 #include <stdio.h> /* For printf() */
 #include <stdlib.h> //for malloc
 #include <string.h> // for string operations
-#include "random.h"
+#include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
 
@@ -12,6 +12,7 @@
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 4 //for runicast
 #define NUM_HISTORY_ENTRIES 4 //for runicast
+
 
 //-----------------------------------------------------------------   
 PROCESS(blink_process, "blink example");
@@ -38,6 +39,8 @@ struct unicastPacket
 	signed char rss;
 	char *msg;
 	double slope;
+        int minutes[30];
+        int vals[30];
 };
 typedef struct unicastPacket ucPacket;
 
@@ -46,6 +49,10 @@ int n;
 uint8_t x; 
 uint8_t y; 
 ucPacket hello;
+
+//Fake vals des capteurs ///TODO : générer des nb random
+int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
+int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
 
 /*---------------------------end of section for packet message structure definition and initialization-------------------------------------*/
 
@@ -136,6 +143,7 @@ PROCESS_THREAD(blink_process, ev, data) {
 /*------section to open socket connection-------*/
 
   broadcast_open(&broadcast, 129, &broadcast_call);
+  //unicast_open(&uc, 146, &unicast_callbacks);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
 /*----end of section to open socket conenction--*/
@@ -147,63 +155,60 @@ PROCESS_THREAD(blink_process, ev, data) {
 
   while (1) {
 
-    linkaddr_t recv;  
+    //linkaddr_t recv; 
+
+    /*--------------timer handling section----------------*/ 
+	
+	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
+    static struct etimer et;
+    etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
+
+    /*------------end of time handling section------------*/
 
     hello.msg = malloc(5);
     hello.msg = "hello";
 
-
-    /*--------------timer handling section----------------*/ 
-	
-	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)
-	
-    static struct etimer etBroadCast;
-    static struct etimer etRunicast;
-
-    
-
-    etimer_set(&etBroadCast,CLOCK_SECOND); //timer d'une seconde
-    
-    
-    
-    //PROCESS_YIELD();
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadCast)); //attend que la seconde expire
-
-    /*------------end of time handling section------------*/
-
-   
     /*---------section to broadcast the discovery message--------*/
 
-    if(etimer_expired(&etBroadCast)){
-
+    
 	
     packetbuf_copyfrom("Discover",10); //ce message est envoyé pour découvrir les nodes dans le réseau
     broadcast_send(&broadcast);
     printf("Broadcast message sent from Sensor Node\n");
-    etimer_reset(&etBroadCast);
-    }
 
- 
+    
 
     /*-------end of section to broadcast the discovery message----*/
 
-    /*------section for runicast message sending-----*/
-
-
-    etimer_set(&etRunicast,CLOCK_SECOND); //timer d'une seconde
-
-   
     
 
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
+    /*--------section for unicast message sending---------------*/
+
+    ///Envoi d'un paquet unicast contenant le message "hello", le rssi et la pente obtenue par la méthode des moindres carrés.///
+    //packetbuf_copyfrom(&hello, sizeof(hello));
+    //recv.u8[0] = x; //x et y ont été récupéré dans la fonction broadcast_recv et
+    //recv.u8[1] = y; //correspondent à l'adresse d'un noeud ayant envoyé un paquet broadcast
+
+    //if the address of reception is the same as the source address it's a loop so we don't waste time to send the packet
+    //if (!linkaddr_cmp(&recv,&linkaddr_node_addr)) { //linkaddr_node_addr contains the RIME address of the node
+      //packetbuf_copyfrom(&hello, sizeof(hello));
+      //unicast_send(&uc,&recv);
+    //}
+
+     /*-----end of section for unicast message sending----------*/
+
+    
 
 
-   if(!runicast_is_transmitting(&runicast) && etimer_expired(&etRunicast) && linkaddr_cmp(&recv, &linkaddr_null)) {
-      //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
+   /*------section for runicast message sending-----------*/
 
-      packetbuf_copyfrom(&hello, sizeof(hello));
-      recv.u8[0] = x; //x et y ont été récupéré dans la fonction broadcast_recv et
-      recv.u8[1] = y; //correspondent à l'adresse d'un noeud ayant envoyé un paquet broadcast
+   if(!runicast_is_transmitting(&runicast)) {
+      linkaddr_t recv;
+
+      packetbuf_copyfrom("Hello", 5);
+      recv.u8[0] = 1;
+      recv.u8[1] = 0;
 
       printf("%u.%u: sending runicast to address %u.%u\n",
 	     linkaddr_node_addr.u8[0],
@@ -212,15 +217,10 @@ PROCESS_THREAD(blink_process, ev, data) {
 	     recv.u8[1]);
 
       runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
-      etimer_reset(&etRunicast);
     }
 
    /*------end of section for runicast message sending-----*/
   }
 
-
-
 PROCESS_END();
 }
-
-

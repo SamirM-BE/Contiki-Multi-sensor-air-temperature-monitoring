@@ -39,8 +39,8 @@ struct unicastPacket
 	signed char rss;
 	char *msg;
 	double slope;
-        int minutes[30];
-        int vals[30];
+        int min[30];
+        int valSensor[30];
 };
 typedef struct unicastPacket ucPacket;
 
@@ -51,8 +51,23 @@ uint8_t y;
 ucPacket hello;
 
 //Fake vals des capteurs ///TODO : générer des nb random
-int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
-int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
+static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
+static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
+
+
+/*---------------------------Section destined to send data to computational node-----------------------------------*/
+
+static void generate_data(){
+  //we fill the hello packet with the value stored in the array
+  int i;
+  for(i=0; i < 30 ; i++){
+    hello.min[i]= minutes[i];
+    hello.valSensor[i]= vals[i];
+  }     
+}
+
+
+/*---------------------------End of section destined to send data to computational node---------------------------*/
 
 /*---------------------------end of section for packet message structure definition and initialization-------------------------------------*/
 
@@ -88,6 +103,14 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 
   printf("runicast message received from %d.%d, seqno %d\n",
 	 from->u8[0], from->u8[1], seqno);
+
+  //we print all the value of the array just to be sure
+  
+   int x;
+   for(x=0;x<30; x++){
+
+  printf("value of received packet : %d\n", *((int *) packetbuf_dataptr()+x));
+  }
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
@@ -168,6 +191,7 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     hello.msg = malloc(5);
     hello.msg = "hello";
+    generate_data();
 
     /*---------section to broadcast the discovery message--------*/
 
@@ -183,30 +207,14 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     
 
-    /*--------section for unicast message sending---------------*/
-
-    ///Envoi d'un paquet unicast contenant le message "hello", le rssi et la pente obtenue par la méthode des moindres carrés.///
-    //packetbuf_copyfrom(&hello, sizeof(hello));
-    //recv.u8[0] = x; //x et y ont été récupéré dans la fonction broadcast_recv et
-    //recv.u8[1] = y; //correspondent à l'adresse d'un noeud ayant envoyé un paquet broadcast
-
-    //if the address of reception is the same as the source address it's a loop so we don't waste time to send the packet
-    //if (!linkaddr_cmp(&recv,&linkaddr_node_addr)) { //linkaddr_node_addr contains the RIME address of the node
-      //packetbuf_copyfrom(&hello, sizeof(hello));
-      //unicast_send(&uc,&recv);
-    //}
-
-     /*-----end of section for unicast message sending----------*/
-
-    
-
-
    /*------section for runicast message sending-----------*/
+   
 
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
 
-      packetbuf_copyfrom("Hello", 5);
+
+      packetbuf_copyfrom(hello.min, sizeof(hello.min));
       recv.u8[0] = 1;
       recv.u8[1] = 0;
 

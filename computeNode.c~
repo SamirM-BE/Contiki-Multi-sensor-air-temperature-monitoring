@@ -86,6 +86,7 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 
   printf("runicast message received from %d.%d, seqno %d\n",
 	 from->u8[0], from->u8[1], seqno);
+
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)

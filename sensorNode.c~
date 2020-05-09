@@ -37,7 +37,7 @@ MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 struct unicastPacket
 {
 	signed char rss;
-	char *msg;
+	char msg;
         int   min; //the minute corresponding ot the value sensor
         int   valSensor; // tab of valSensor
 };
@@ -48,13 +48,10 @@ int n;
 uint8_t x; 
 uint8_t y; 
 ucPacket hello;
-//static int *tmp = malloc(sizeof(int)*30);
-//hello.min = (int *) malloc(sizeof(int)*30);
-//hello.valSensor = (int *) malloc(sizeof(int)*30);
 
 //Fake vals des capteurs ///TODO : générer des nb random
-static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
-static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
+//static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
+//static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
 
 static int clock = 1;
 
@@ -133,9 +130,14 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 
   /* Grab the pointer to the incoming data. */
   msg = packetbuf_dataptr();
+  
+  //ici je print caca en test mais il faudra en fait lancer la computation de la slope pour voir s'il faut envoyer ou pas au sensor node la commande d'ouvrir sa valve pendant 10 min
+  if(msg -> min == 30){
+     //printf("Caca \n");
+  }
    
 
-  printf("value of received packet :%d\n", msg->min);
+  //printf("value of received packet :%d\n", msg->min);
   
 }
 
@@ -215,8 +217,8 @@ PROCESS_THREAD(blink_process, ev, data) {
 
     /*------------end of time handling section------------*/
 
-    hello.msg = malloc(5);
-    hello.msg = "hello";
+    //hello.msg = malloc(5);
+    hello.msg = 'C'; //We send him the letter C representing the COMPUTE operation
     generate_random_data();
 
     //the clock is used to tell to the receiver to which time corresponds the sensor value it receives
@@ -256,8 +258,8 @@ PROCESS_THREAD(blink_process, ev, data) {
 
       //packetbuf_copyfrom( &hello, sizeof(struct unicastPacket*)*50);
       packetbuf_copyfrom( &hello, sizeof(hello));
-      recv.u8[0] = 1;
-      recv.u8[1] = 0;
+      recv.u8[0] = x;
+      recv.u8[1] = y;
 
       printf("%u.%u: sending runicast to address %u.%u\n",
 	     linkaddr_node_addr.u8[0],

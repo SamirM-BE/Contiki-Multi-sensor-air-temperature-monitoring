@@ -14,8 +14,9 @@
 #define NUM_HISTORY_ENTRIES 4 //for runicast
 
 //-----------------------------------------------------------------   
-PROCESS(blink_process, "blink example");
-AUTOSTART_PROCESSES( & blink_process);
+PROCESS(runicast_process, "runicast mechanism");
+PROCESS(broadcast_process, "broadcast mechanism");
+AUTOSTART_PROCESSES(&broadcast_process);
 
 /*----------------------------------runicast initialization section-----------------------------------------*/
 /* OPTIONAL: Sender history.
@@ -53,6 +54,8 @@ static double treshHold = 2.0; // le treshhold au dessus duquel on dira au senso
 static int openValve = 0; //cette valeur nous servira de trigger pour envoyer au sensor node l'ordre d'ouvrir sa valve
 static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};// the tab used for x values of slope computation
 static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24}; //the tab for fake sensors value received from sensor node we'll fill dynamically
+
+static int isRunicastStarted = 0; //boolean to tell the system if the runicast process has started, important in order not to relaunch it at every boradcast message received
 
 /*---------------------------end of section for packet message structure definition and initialization-------------------------------------*/
 
@@ -132,9 +135,6 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   printf("son instruction : %c\n", msg->msg);
   printf("value of received packet :%d\n", msg->min);
 
-  //printf("BRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
-
-  
 
 
   //on lance la computation si et seulement si le gars met en message dans sa structure qu'il veut le C pour COmput, car par après il pourra aussi mettre dans son msg field un autre mot relatif au routing
@@ -204,6 +204,16 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 	rss_val = cc2420_last_rssi;
 	hello.rss = rss_val+45; // d'après la documentation il faut toujours rajouter 45 au rssi
 	printf("RSSI of Last Received Packet = %d dBm\n",hello.rss);
+
+        //we launch the runicast process thread only if it is not started yet
+        if(isRunicastStarted==0){
+
+        printf("ONLY ONCE");
+        //Since we've received our first broadcast message for discovery, we can start to send runicast message direclty to a receiver, not before because we don't know anyone yet
+        process_start(&runicast_process, NULL);
+        isRunicastStarted = 1;
+
+        }
 }
 
 static const struct broadcast_callbacks broadcast_call = {
@@ -214,15 +224,13 @@ static struct broadcast_conn broadcast;
 /*------------------------------end of boradcast section for network discovery--------------------------------*/
 
 //-----------------------------------------------------------------
-PROCESS_THREAD(blink_process, ev, data) {
+PROCESS_THREAD(runicast_process, ev, data) {
 
   PROCESS_EXITHANDLER(broadcast_close(&broadcast););
   PROCESS_BEGIN();
 
 /*------section to open socket connection-------*/
 
-  broadcast_open(&broadcast, 129, &broadcast_call);
-  //unicast_open(&uc, 146, &unicast_callbacks);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
 /*----end of section to open socket conenction--*/
@@ -234,38 +242,21 @@ PROCESS_THREAD(blink_process, ev, data) {
 
   while (1) {
 
-    //linkaddr_t recv; 
-
     /*--------------timer handling section----------------*/ 
 	
-	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
-    static struct etimer et;
-    etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
+    ////Timer handling the rate at which we'll send the runicast message with fake sensor data	
+    static struct etimer etRunicast;
+    etimer_set(&etRunicast,CLOCK_SECOND); //timer d'une seconde
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
+
 
     /*------------end of time handling section------------*/
 
-    //hello.msg = malloc(5);
     hello.msg = 'K';
-
-    /*---------section to broadcast the discovery message--------*/
-
     
-	
-    packetbuf_copyfrom("Discover",10); //ce message est envoyé pour découvrir les nodes dans le réseau
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent from Sensor Node\n");
-
-    
-
-    /*-------end of section to broadcast the discovery message----*/
-
-    
-
    /*------section for runicast message sending-----------*/
 
    
-
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
       
@@ -296,4 +287,46 @@ PROCESS_THREAD(blink_process, ev, data) {
   }
 
 PROCESS_END();
+}
+
+/*-------------------------------------------Process handling broadcasting------------------------------------------------------*/
+PROCESS_THREAD(broadcast_process, ev, data)
+{
+  PROCESS_BEGIN(); 
+  printf("PROCESS LANCE\n");
+
+  /*------section to open socket connection-------*/
+
+  broadcast_open(&broadcast, 129, &broadcast_call);
+
+  /*----end of section to open socket conenction--*/
+
+    while (1) {
+
+    /*--------------timer handling section----------------*/ 
+	
+    //Timer handling the rate at which we'll send the DISCOVER message	
+    static struct etimer etBroadcast;
+    etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
+    
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //attend que la seconde expire
+
+
+    /*------------end of timer handling section------------*/
+  
+
+    /*---------section to broadcast the discovery message--------*/
+   
+	
+    packetbuf_copyfrom("Discover",10); //ce message est envoyé pour découvrir les nodes dans le réseau
+    broadcast_send(&broadcast);
+    printf("Broadcast message sent from Sensor Node\n");
+    
+
+    /*-------end of section to broadcast the discovery message----*/
+
+    
+  }
+
+  PROCESS_END();
 }

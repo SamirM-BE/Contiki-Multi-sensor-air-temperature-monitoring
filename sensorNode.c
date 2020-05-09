@@ -15,7 +15,7 @@
 
 
 //-----------------------------------------------------------------   
-PROCESS(runicast_process, "runicast mechanism");
+PROCESS(runicast_process, "runicast mechanism, handle the toggling of the light every 1 minute too");
 PROCESS(broadcast_process, "broadcast mechanism");
 PROCESS(openValve_process, "open the valve for 10 minutes");
 AUTOSTART_PROCESSES(&broadcast_process);
@@ -60,6 +60,7 @@ ucPacket hello;
 
 static int clock = 1; //our clock for the minute axis to send to the computational node
 static int toToggle = 0;  //variable boolean which will help to toggel the led for 10 minutes
+static int isRunicastStarted = 0; //boolean to tell the system if the runicast process has started, important in order not to relaunch it at every boradcast message received
 
  
 
@@ -141,17 +142,15 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   //si on reçoit un message du type openValve on toggle la LED pour 10 minutes, sais pas encore comment faire les 10 min
   if(strcmp(msg,"openValve") ==  0){
      printf("TOOOOOOGLE\n");
-     //on étient d'abord toutes les LED
-     leds_off(LEDS_ALL);
-     //ensuite on les allumes
+     //we have to toggle the led for 10 minutes so we set the flag
+     toToggle = 1;
      
-     
-     //if(etimer_expired(&etLed)){
-     leds_on(LEDS_ALL);
      //}
 
      //ensuite on lance le process destiné à géré le truc de 10 minutes mais avant quand ce sera fait pas oublié de mettre en pause le processus qui le toggle toutes les minutes
      //surtout pas oublié de faire le process yield dns le processus qui gère le blinking régulier
+     leds_off(LEDS_ALL);
+     leds_toggle(LEDS_ALL);
      process_start(&openValve_process, NULL);
   }
    
@@ -196,8 +195,16 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 	hello.rss = rss_val+45; // d'après la documentation il faut toujours rajouter 45 au rssi
 	printf("RSSI of Last Received Packet = %d dBm\n",hello.rss);
 
+
+        //we launch the runicast process thread only if it is not started yet
+        if(isRunicastStarted==0){
+
+        printf("ONLY ONCE");
         //Since we've received our first broadcast message for discovery, we can start to send runicast message direclty to a receiver, not before because we don't know anyone yet
         process_start(&runicast_process, NULL);
+        isRunicastStarted = 1;
+
+        }
 }
 
 static const struct broadcast_callbacks broadcast_call = {
@@ -223,9 +230,30 @@ PROCESS_THREAD(runicast_process, ev, data) {
   //Cette partie est utilisée pour runicast mais j'ai pas encore compris à quoi elle pouvait servir
   /* OPTIONAL: Sender history */
   list_init(history_table);
-  memb_init(&history_mem);
+  memb_init(&history_mem); 
+  
+        //we turn on all the leds, turning on the leds means starting generation of fake data
+      leds_on(LEDS_ALL);
 
   while (1) {
+
+     //if we have to open the valve for 10 minutes coming from a statement from the computational node, we exit this process so we don't send value anymore to computational node
+     //this runicast activity will be resumed by the openValve process as soon as the 10 minutes delay will be done
+     //we make sure we turn off all the leds before
+      if(toToggle ==  1){
+        PROCESS_EXIT();
+      }
+
+
+      generate_random_data();
+
+     //the clock is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
+    clock++;
+
+    if(clock == 31){
+      clock = 1;
+    }
+
 
     /*--------------timer handling section----------------*/ 
 	
@@ -235,19 +263,17 @@ PROCESS_THREAD(runicast_process, ev, data) {
     
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
 
+    //as soon as the time has expired, we can turn off the leds, that means we have finished the sampling
+
+    leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+
 
     /*------------end of time handling section------------*/
 
     //hello.msg = malloc(5);
     hello.msg = 'C'; //We send him the letter C representing the COMPUTE operation
-    generate_random_data();
 
-    //the clock is used to tell to the receiver to which time corresponds the sensor value it receives
-    clock++;
-
-    if(clock == 31){
-      clock = 1;
-    }
+    
     
 
    /*------section for runicast message sending-----------*/
@@ -282,11 +308,24 @@ PROCESS_THREAD(openValve_process, ev, data)
   printf("PROCESS LANCE\n");
 
   static struct etimer etLed;
-  etimer_set(&etLed,2*CLOCK_SECOND); //timer de 2 secondes
+  etimer_set(&etLed,600*CLOCK_SECOND); //timer de 50 secondes
+
+     //on étient d'abord toutes les LED
+     //leds_off(LEDS_ALL);
+     //ensuite on les allumes
+
+     
+     leds_toggle(LEDS_ALL);
+    
+
+     //printf("NIGGA %u\n", leds_get);
 
   PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etLed)); //attend que la seconde expire
 
-  leds_off(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+  leds_off(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec 
+  toToggle = 0; //we reset this flag to 0 in order to let the normal toggling process resuming its task
+  process_start(&runicast_process, NULL);
+  isRunicastStarted = 1; //we don't forget to set the isRunicastStarted variable to 0
   PROCESS_EXIT();//ensuite on exit le process sinon il va toggle toutes les 5 secondes car le process restera actif pour tjs
 
   PROCESS_END();

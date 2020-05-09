@@ -269,10 +269,12 @@ PROCESS_THREAD(blink_process, ev, data) {
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
       
-      //if the thresshold is exceeded, we send the OPEN VALVE message. 
+      //if the thresshold is exceeded, we send the OPEN VALVE message.
+
+      if(openValve==1){ 
       
 
-      packetbuf_copyfrom("hello", 5);
+      packetbuf_copyfrom("openValve", 9);
       recv.u8[0] = x;
       recv.u8[1] = y;
 
@@ -284,6 +286,7 @@ PROCESS_THREAD(blink_process, ev, data) {
 
       runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
     }
+   }
 
 
 

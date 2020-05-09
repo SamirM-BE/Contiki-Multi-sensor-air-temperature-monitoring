@@ -49,11 +49,14 @@ uint8_t x;
 uint8_t y; 
 ucPacket hello;
 
+
+
 //Fake vals des capteurs ///TODO : générer des nb random
 //static int minutes[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30};
 //static int vals[] = {24, 57, 18, 19, 70, 37, 11, 24, 82, 74, 12, 18, 12, 27, 31, 71, 62, 58, 45, 92, 2, 13, 24, 57, 18, 19, 70, 37, 11, 24};
 
-static int clock = 1;
+static int clock = 1; //our clock for the minute axis to send to the computational node
+static int toToggle = 0;  //variable boolean which will help to toggel the led for 10 minutes
 
  
 
@@ -126,14 +129,23 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   
    
 
-    struct unicastPacket *msg;
+    char *msg;
 
   /* Grab the pointer to the incoming data. */
   msg = packetbuf_dataptr();
   
   //ici je print caca en test mais il faudra en fait lancer la computation de la slope pour voir s'il faut envoyer ou pas au sensor node la commande d'ouvrir sa valve pendant 10 min
-  if(msg -> min == 30){
-     //printf("Caca \n");
+  //si on reçoit un message du type openValve on toggle la LED pour 10 minutes, sais pas encore comment faire les 10 min
+  if(strcmp(msg,"openValve") ==  0){
+     printf("TOOOOOOGLE\n");
+     //on étient d'abord toutes les LED
+     leds_off(LEDS_ALL);
+     //ensuite on les allumes
+     
+     
+     //if(etimer_expired(&etLed)){
+     leds_on(LEDS_ALL);
+     //}
   }
    
 
@@ -213,7 +225,11 @@ PROCESS_THREAD(blink_process, ev, data) {
 	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
     static struct etimer et;
     etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
+    //static struct etimer etLed;//the time for the led to stay on when they have to
+    //etimer_set(&etLed,3*CLOCK_SECOND);//on set le time à 3 sec
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
+
+
 
     /*------------end of time handling section------------*/
 

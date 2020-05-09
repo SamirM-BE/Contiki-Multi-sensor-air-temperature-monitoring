@@ -79,7 +79,7 @@ static int leastSquare(int minutes[], int vals[])
        return 1;
      }
 
-     return 0;
+     return 1;
 }
 
 /*---------------------------end fo section related to the computation of sensor data------------------*/
@@ -285,6 +285,8 @@ PROCESS_THREAD(blink_process, ev, data) {
 	     recv.u8[1]);
 
       runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
+      //ici pas oublier de remettre le openValve à zéro sinon il va l'envoyer tout le temps après suivant le rythme du timer
+      openValve = 0;
     }
    }
 

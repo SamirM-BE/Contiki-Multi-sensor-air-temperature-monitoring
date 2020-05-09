@@ -16,6 +16,7 @@
 
 //-----------------------------------------------------------------   
 PROCESS(blink_process, "blink example");
+PROCESS(caca, "LED blink process");
 AUTOSTART_PROCESSES( & blink_process);
 
 /*----------------------------------runicast section-----------------------------------------*/
@@ -48,6 +49,7 @@ int n;
 uint8_t x; 
 uint8_t y; 
 ucPacket hello;
+
 
 
 
@@ -146,6 +148,10 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
      //if(etimer_expired(&etLed)){
      leds_on(LEDS_ALL);
      //}
+
+     //ensuite on lance le process destiné à géré le truc de 10 minutes mais avant quand ce sera fait pas oublié de mettre en pause le processus qui le toggle toutes les minutes
+     //surtout pas oublié de faire le process yield dns le processus qui gère le blinking régulier
+     process_start(&caca, NULL);
   }
    
 
@@ -196,7 +202,6 @@ static const struct broadcast_callbacks broadcast_call = {
 static struct broadcast_conn broadcast;
 
 /*------------------------------end of boradcast section for network discovery--------------------------------*/
-
 //-----------------------------------------------------------------
 PROCESS_THREAD(blink_process, ev, data) {
 
@@ -225,8 +230,7 @@ PROCESS_THREAD(blink_process, ev, data) {
 	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
     static struct etimer et;
     etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
-    //static struct etimer etLed;//the time for the led to stay on when they have to
-    //etimer_set(&etLed,3*CLOCK_SECOND);//on set le time à 3 sec
+    
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
 
 
@@ -290,4 +294,43 @@ PROCESS_THREAD(blink_process, ev, data) {
   }
 
 PROCESS_END();
+}
+
+/*-----------------------------the other process responsible for blinking-----------------------*/
+PROCESS_THREAD(caca, ev, data)
+{
+  PROCESS_BEGIN(); 
+  printf("PROCESS LANCE\n");
+
+  static struct etimer etLed;
+  etimer_set(&etLed,2*CLOCK_SECOND); //timer de 2 secondes
+
+  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etLed)); //attend que la seconde expire
+
+  leds_off(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+  PROCESS_EXIT();//ensuite on exit le process sinon il va toggle toutes les 5 secondes car le process restera actif pour tjs
+
+
+  
+
+  //static struct etimer etLed;//the time for the led to stay on when they have to
+  //etimer_set(&etLed,3*CLOCK_SECOND);//on set le time à 3 sec
+
+  /*
+  
+
+  while(1) {
+    etimer_set(&et_blink, CLOCK_SECOND);
+
+    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
+
+    leds_off(LEDS_ALL);
+    leds_on(blinks & LEDS_ALL);
+    blinks++;
+    printf("Blink... (state %0.2X)\n", leds_get());
+  }
+
+ */
+
+  PROCESS_END();
 }

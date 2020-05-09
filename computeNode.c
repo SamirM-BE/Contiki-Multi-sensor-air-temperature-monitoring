@@ -79,7 +79,7 @@ static int leastSquare(int minutes[], int vals[])
        return 1;
      }
 
-     return 1;
+     return 0;
 }
 
 /*---------------------------end fo section related to the computation of sensor data------------------*/

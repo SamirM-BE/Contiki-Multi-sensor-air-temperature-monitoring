@@ -15,9 +15,10 @@
 
 
 //-----------------------------------------------------------------   
-PROCESS(blink_process, "blink example");
-PROCESS(caca, "LED blink process");
-AUTOSTART_PROCESSES( & blink_process);
+PROCESS(runicast_process, "runicast mechanism");
+PROCESS(broadcast_process, "broadcast mechanism");
+PROCESS(openValve_process, "open the valve for 10 minutes");
+AUTOSTART_PROCESSES(&broadcast_process);
 
 /*----------------------------------runicast section-----------------------------------------*/
 /* OPTIONAL: Sender history.
@@ -151,7 +152,7 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 
      //ensuite on lance le process destiné à géré le truc de 10 minutes mais avant quand ce sera fait pas oublié de mettre en pause le processus qui le toggle toutes les minutes
      //surtout pas oublié de faire le process yield dns le processus qui gère le blinking régulier
-     process_start(&caca, NULL);
+     process_start(&openValve_process, NULL);
   }
    
 
@@ -194,6 +195,9 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 	rss_val = cc2420_last_rssi;
 	hello.rss = rss_val+45; // d'après la documentation il faut toujours rajouter 45 au rssi
 	printf("RSSI of Last Received Packet = %d dBm\n",hello.rss);
+
+        //Since we've received our first broadcast message for discovery, we can start to send runicast message direclty to a receiver, not before because we don't know anyone yet
+        process_start(&runicast_process, NULL);
 }
 
 static const struct broadcast_callbacks broadcast_call = {
@@ -203,15 +207,15 @@ static struct broadcast_conn broadcast;
 
 /*------------------------------end of boradcast section for network discovery--------------------------------*/
 //-----------------------------------------------------------------
-PROCESS_THREAD(blink_process, ev, data) {
+PROCESS_THREAD(runicast_process, ev, data) {
 
   PROCESS_EXITHANDLER(broadcast_close(&broadcast););
-  PROCESS_BEGIN();
+  PROCESS_BEGIN(); 
+
+  printf("RUNICAST STARTED\n");
 
 /*------section to open socket connection-------*/
 
-  broadcast_open(&broadcast, 129, &broadcast_call);
-  //unicast_open(&uc, 146, &unicast_callbacks);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
 /*----end of section to open socket conenction--*/
@@ -223,16 +227,13 @@ PROCESS_THREAD(blink_process, ev, data) {
 
   while (1) {
 
-    //linkaddr_t recv; 
-
     /*--------------timer handling section----------------*/ 
 	
-	//Ce timer est essentiel pour traiter les paquets reçus, sans ça, ça ne fonctionne pas (IDK why)	
-    static struct etimer et;
-    etimer_set(&et,CLOCK_SECOND); //timer d'une seconde
+    ////Timer handling the rate at which we'll send the runicast message with fake sensor data	
+    static struct etimer etRunicast;
+    etimer_set(&etRunicast,CLOCK_SECOND); //timer d'une seconde
     
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et)); //attend que la seconde expire
-
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
 
 
     /*------------end of time handling section------------*/
@@ -247,22 +248,6 @@ PROCESS_THREAD(blink_process, ev, data) {
     if(clock == 31){
       clock = 1;
     }
-
-
-  
-
-    /*---------section to broadcast the discovery message--------*/
-
-    
-	
-    packetbuf_copyfrom("Discover",10); //ce message est envoyé pour découvrir les nodes dans le réseau
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent from Sensor Node\n");
-
-    
-
-    /*-------end of section to broadcast the discovery message----*/
-
     
 
    /*------section for runicast message sending-----------*/
@@ -271,12 +256,6 @@ PROCESS_THREAD(blink_process, ev, data) {
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
 
-
-      //we'll send the first element of the structure
-
-
-
-      //packetbuf_copyfrom( &hello, sizeof(struct unicastPacket*)*50);
       packetbuf_copyfrom( &hello, sizeof(hello));
       recv.u8[0] = x;
       recv.u8[1] = y;
@@ -297,7 +276,7 @@ PROCESS_END();
 }
 
 /*-----------------------------the other process responsible for blinking-----------------------*/
-PROCESS_THREAD(caca, ev, data)
+PROCESS_THREAD(openValve_process, ev, data)
 {
   PROCESS_BEGIN(); 
   printf("PROCESS LANCE\n");
@@ -310,27 +289,46 @@ PROCESS_THREAD(caca, ev, data)
   leds_off(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
   PROCESS_EXIT();//ensuite on exit le process sinon il va toggle toutes les 5 secondes car le process restera actif pour tjs
 
+  PROCESS_END();
+}
+/*-------------------------------------------Process handling broadcasting------------------------------------------------------*/
+PROCESS_THREAD(broadcast_process, ev, data)
+{
+  PROCESS_BEGIN(); 
+  printf("PROCESS LANCE\n");
 
+  /*------section to open socket connection-------*/
+
+  broadcast_open(&broadcast, 129, &broadcast_call);
+
+  /*----end of section to open socket conenction--*/
+
+    while (1) {
+
+    /*--------------timer handling section----------------*/ 
+	
+    //Timer handling the rate at which we'll send the DISCOVER message	
+    static struct etimer etBroadcast;
+    etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
+    
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //attend que la seconde expire
+
+
+    /*------------end of timer handling section------------*/
   
 
-  //static struct etimer etLed;//the time for the led to stay on when they have to
-  //etimer_set(&etLed,3*CLOCK_SECOND);//on set le time à 3 sec
+    /*---------section to broadcast the discovery message--------*/
+   
+	
+    packetbuf_copyfrom("Discover",10); //ce message est envoyé pour découvrir les nodes dans le réseau
+    broadcast_send(&broadcast);
+    printf("Broadcast message sent from Sensor Node\n");
+    
 
-  /*
-  
+    /*-------end of section to broadcast the discovery message----*/
 
-  while(1) {
-    etimer_set(&et_blink, CLOCK_SECOND);
-
-    PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_TIMER);
-
-    leds_off(LEDS_ALL);
-    leds_on(blinks & LEDS_ALL);
-    blinks++;
-    printf("Blink... (state %0.2X)\n", leds_get());
+    
   }
-
- */
 
   PROCESS_END();
 }

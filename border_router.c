@@ -18,7 +18,7 @@
 //-----------------------------------------------------------------   
 PROCESS(runicast_process, "runicast mechanism, handle the toggling of the light every 1 minute too");
 PROCESS(broadcast_process, "broadcast mechanism");
-AUTOSTART_PROCESSES(&broadcast_process);
+AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
 
 /*----------------------------------runicast section-----------------------------------------*/
 /* OPTIONAL: Sender history.
@@ -39,9 +39,10 @@ MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 struct unicastPacket
 {
 	char* msg;
-        int min; //the minute corresponding ot the value sensor
-        int valSensor; //valSensor
-	bool child_confirmation; //Set to true if unicast is send to confirm childhood
+	int min; //the minute corresponding ot the value sensor
+	int valSensor; //valSensor
+	bool confirmChild;
+	bool actionValve;
 };
 typedef struct unicastPacket ucPacket;
 
@@ -102,11 +103,14 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 	 from->u8[0], from->u8[1], seqno);
 
   /* Grab the pointer to the incoming data. */ 
-  ucPacket* received_packet = packetbuf_dataptr();
-  //char* msg = received_packet->msg;
+  ucPacket* received_packet = (ucPacket*) packetbuf_dataptr();
+  char* msg = received_packet->msg;
+  bool child_conf = received_packet->confirmChild;
+  int min = received_packet->min;
+  int val_sens = received_packet->valSensor;
+  bool actionValve = received_packet->actionValve;
 
-  printf("Min: %d, sensor value: %d \n", received_packet->min, received_packet->valSensor);
-  
+  printf("Min: %d, sensor value: %d, child_conf:%d, msg: %s \n", min, val_sens, child_conf, msg); 
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
@@ -127,7 +131,7 @@ static struct runicast_conn runicast;
 
 
 static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
-        //TODO ?
+	printf("Broadcast received \n");
 	/*
 	static signed char rss_val; 
 	broadcastPacket* rcv = packetbuf_dataptr();
@@ -186,14 +190,12 @@ PROCESS_THREAD(runicast_process, ev, data) {
   list_init(history_table);
   memb_init(&history_mem); 
   
-        //we turn on all the leds, turning on the leds means starting generation of fake data
-      leds_on(LEDS_ALL);
+  //we turn on all the leds, turning on the leds means starting generation of fake data
+  //leds_on(LEDS_ALL);
 
-  while (1) {
-        //TODO 
-  }
+  PROCESS_WAIT_EVENT_UNTIL(0);
 
-PROCESS_END();
+  PROCESS_END();
 }
 
 
@@ -204,21 +206,21 @@ PROCESS_THREAD(broadcast_process, ev, data)
 
   broadcast_open(&broadcast, 129, &broadcast_call);
 
-    while (1) {
+	while (1) {
 	
-    //Timer handling the rate at which we'll send the DISCOVER message	
-    static struct etimer etBroadcast;
-    etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
-    
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //Wait for timer to end
+		//Timer handling the rate at which we'll send the DISCOVER message	
+		static struct etimer etBroadcast;
+		etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
+		
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //Wait for timer to end
 
-    broadcastPacket packet;
-    packet.src.u8[0] = linkaddr_node_addr.u8[0];
-    packet.src.u8[1] = linkaddr_node_addr.u8[1];
-    packet.asPathToServer = pathToServer;	
-    packetbuf_copyfrom(&packet, sizeof(packet)); //Message to send to all reachable nodes
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent from Border Router\n");
+		broadcastPacket packet;
+		packet.src.u8[0] = linkaddr_node_addr.u8[0];
+		packet.src.u8[1] = linkaddr_node_addr.u8[1];
+		packet.asPathToServer = pathToServer;	
+		packetbuf_copyfrom(&packet, sizeof(packet)); //Message to send to all reachable nodes
+		broadcast_send(&broadcast);
+		printf("Broadcast message sent from Border Router\n");
 
   }
 

@@ -9,7 +9,7 @@
 #include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
-
+#include "../PROJECT1/mobileP2/linkedList.h" // Handle linkedlist
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 4 //for runicast
@@ -34,15 +34,15 @@ LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 
 /*-------------------------------section for packet message structure definition and initialization---------------------------------*/
-
 //Représente un paquet unicast, le contenu est encore à déterminer
 //TODO : Mettre cette structure dans un .h ?
 struct unicastPacket
 {
 	char* msg;
-        int min; //the minute corresponding ot the value sensor
-        int valSensor; //valSensor
-	bool child_confirmation; //Set to true if unicast is send to confirm childhood
+	int min; //the minute corresponding ot the value sensor
+	int valSensor; //valSensor
+	bool confirmChild;
+	bool actionValve;
 };
 typedef struct unicastPacket ucPacket;
 
@@ -63,23 +63,15 @@ struct Parent
 };
 typedef struct Parent Parent;
 
-typedef struct Child Child;
-struct Child
-{
-	linkaddr_t addr;
-	Child* next;
-};
-
 int n;
 
-static Child childs;
+static struct Child *head;
 static Parent parent;
 static bool pathToServer = false;
-static int clock = 1; //our clock for the minute axis to send to the computational node
+static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
 static int toToggle = 0;  //variable boolean which will help to toggel the led for 10 minutes
 static int isRunicastStarted = 0; //boolean to tell the system if the runicast process has started, important in order not to relaunch it at every boradcast message received
-
-
+static bool confirmChild = false;
 
 static ucPacket generate_random_data(ucPacket sendPacket){
   //we fill the packet with the value stored in the array
@@ -95,9 +87,17 @@ static ucPacket generate_random_data(ucPacket sendPacket){
  }
  
   int proposal_value = (random_val % max_val) + min_val;
-  sendPacket.min = clock;
+  sendPacket.min = clock_s;
   sendPacket.valSensor = proposal_value;
   return sendPacket;
+}
+
+static void resetParent(){
+	parent.addr.u8[0] = 0;
+	parent.addr.u8[1] = 0;
+	parent.rss = INT_MIN;
+	parent.valid = false;
+	pathToServer = false;
 }
 
 
@@ -134,32 +134,44 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   /* Grab the pointer to the incoming data. */ 
   ucPacket* received_packet = (ucPacket*) packetbuf_dataptr();
   char* msg = received_packet->msg;
-  bool child_conf = received_packet->child_confirmation;
+  bool child_conf = received_packet->confirmChild;
   int min = received_packet->min;
   int val_sens = received_packet->valSensor;
+  bool actionValve = received_packet->actionValve;
 
   printf("Min: %d, sensor value: %d, child_conf:%d, msg: %s \n", min, val_sens, child_conf, msg);
   
-  //ici je print caca en test mais il faudra en fait lancer la computation de la slope pour voir s'il faut envoyer ou pas au sensor node la commande d'ouvrir sa valve pendant 10 min
-  //si on reçoit un message du type openValve on toggle la LED pour 10 minutes, sais pas encore comment faire les 10 min
+	if(child_conf){
+		//TODO add child to child's list
+		/*
+		const linkaddr_t me = {{from->u8[0], from->u8[1]}};
+		const linkaddr_t m2 = {{5,9}};
+		head = insert(head, me);
+		head = insert(head, m2);
+		printList(head);
+		*/
+		//If new child is my parent, reset parent after adding child to child's list
+		if(linkaddr_cmp(from, &parent.addr) != 0){
+			printf("from: %d %d parent: %d %d \n", from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
+			printf("reset parent \n");
+			parent.addr.u8[0] = 0;
+			parent.addr.u8[1] = 0;
+			parent.valid = false;
+		}
+	}
   
-  if(strcmp(msg,"openValve") ==  0){
+  //si on reçoit un message du type openValve on toggle la LED pour 10 minutes, sais pas encore comment faire les 10 min
+  if(actionValve){
      printf("TOOOOOOGLE\n");
-     //we have to toggle the led for 10 minutes so we set the flag
-     toToggle = 1;
-     
-     //}
-
+     toToggle = 1; //we have to toggle the led for 10 minutes so we set the flag
+	 
      //ensuite on lance le process destiné à géré le truc de 10 minutes mais avant quand ce sera fait pas oublié de mettre en pause le processus qui le toggle toutes les minutes
      //surtout pas oublié de faire le process yield dns le processus qui gère le blinking régulier
      leds_off(LEDS_ALL);
      leds_toggle(LEDS_ALL);
      process_start(&openValve_process, NULL);
   }
-   
-
-  //printf("value of received packet :%d\n", msg->min);
-  
+     
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
@@ -169,8 +181,11 @@ static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t
 }
 static void timedout_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
 {
-  printf("runicast message timed out when sending to %d.%d, retransmissions %d\n",
-	 to->u8[0], to->u8[1], retransmissions);
+	// Parent lost
+	printf("runicast message timed out when sending to %d.%d, retransmissions %d\n", to->u8[0], to->u8[1], retransmissions);
+	resetParent(); //Set unknown parent
+	process_exit(&runicast_process); //Kill runicast process
+	isRunicastStarted = 0;
 }
 
 static const struct runicast_callbacks runicast_callbacks = {recv_runicast,
@@ -199,15 +214,17 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 		parent.rss = rss;
 		parent.valid = true;
 		pathToServer = true;
+		confirmChild = true;
 	}
 	else{
 		printf("lower signal received or noth path to server detected !\n");
 	}
 
 	if(parent.valid){
-		 printf("Parent: %d.%d - RSS %d dBm \n", parent.addr.u8[0], parent.addr.u8[1], parent.rss);
-	
-		if(isRunicastStarted==0){ //we launch the runicast process thread only if it is not started yet
+		printf("Parent: %d.%d - RSS %d dBm \n", parent.addr.u8[0], parent.addr.u8[1], parent.rss);
+		
+		//we launch the runicast process thread only if it is not started yet
+		if(isRunicastStarted==0){ 
 			printf("ONLY ONCE");
 			process_start(&runicast_process, NULL);
 			isRunicastStarted = 1;
@@ -224,7 +241,7 @@ static struct broadcast_conn broadcast;
 //-----------------------------------------------------------------
 PROCESS_THREAD(runicast_process, ev, data) {
 
-  PROCESS_EXITHANDLER(broadcast_close(&broadcast););
+  PROCESS_EXITHANDLER(broadcast_close(&broadcast);); //TODO c'est pas correct ca si ?
   PROCESS_BEGIN(); 
 
   printf("RUNICAST STARTED\n");
@@ -248,11 +265,6 @@ PROCESS_THREAD(runicast_process, ev, data) {
       if(toToggle ==  1){
         PROCESS_EXIT();
       }
-
-     
-
-
-    /*--------------timer handling section----------------*/ 
 	
     // Timer handling the rate at which we'll send the runicast message with fake sensor data	
     static struct etimer etRunicast;
@@ -266,20 +278,18 @@ PROCESS_THREAD(runicast_process, ev, data) {
     
      ucPacket sendPacket1; //Packet to send
      ucPacket sendPacket = generate_random_data(sendPacket1);
-     printf("coucou \n");
      printf("Packet: %d %d \n", sendPacket.min, sendPacket.valSensor);
 
+     //the clock_s is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
+    clock_s++;
 
-     //the clock is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
-    clock++;
-
-    if(clock == 31){
-      clock = 1;
+    if(clock_s == 31){
+      clock_s = 1;
     }
     sendPacket.msg = "C"; //We send him the letter C representing the COMPUTE operation
-    sendPacket.child_confirmation = true;
-
-   
+	sendPacket.confirmChild = confirmChild;
+	confirmChild = false;
+	
    if(!runicast_is_transmitting(&runicast)) {
       linkaddr_t recv;
 
@@ -332,10 +342,7 @@ PROCESS_THREAD(broadcast_process, ev, data)
 {
   PROCESS_BEGIN(); 
   printf("PROCESS LANCE\n");
-  parent.addr.u8[0] = 0;
-  parent.addr.u8[1] = 0;
-  parent.rss = INT_MIN;
-  parent.valid = false;
+  resetParent();
 
   broadcast_open(&broadcast, 129, &broadcast_call);
 
@@ -360,3 +367,4 @@ PROCESS_THREAD(broadcast_process, ev, data)
 
   PROCESS_END();
 }
+

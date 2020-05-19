@@ -6,6 +6,7 @@
 #include <stdbool.h> // for boolean
 #include <string.h> // for string operations
 #include <limits.h> 
+#include <time.h> // handle keep-alive of parent
 #include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
@@ -54,11 +55,13 @@ struct broadCastPacket
 };
 typedef struct broadCastPacket broadcastPacket;
 
+
 struct Parent
 {
 	bool valid;
 	int rss;
 	linkaddr_t addr;
+        int last_update; //TODO timestamp
 };
 typedef struct Parent Parent;
 
@@ -198,6 +201,7 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 		parent.rss = rss;
 		parent.valid = true;
 		pathToServer = true;
+		//TODO send unicast child_confirmation = true - idea: handle with boolean directly in runicast process
 	}
 	else{
 		printf("lower signal received or noth path to server detected !\n");

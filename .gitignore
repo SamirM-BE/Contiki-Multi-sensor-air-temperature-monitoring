@@ -1,3 +1,7 @@
 *.z1
 *.a
 *.map
+obj_z1/*
+/obj_z1/*
+obj_z1/
+obj_z1

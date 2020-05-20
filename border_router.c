@@ -76,6 +76,7 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
 {
   printf("RUNICAST RECEIVED\n");
   /* OPTIONAL: Sender history */
+  
   struct history_entry *e = NULL;
   for(e = list_head(history_table); e != NULL; e = e->next) {
     if(linkaddr_cmp(&e->addr, from)) {
@@ -187,8 +188,8 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
   //Cette partie est utilisée pour runicast mais j'ai pas encore compris à quoi elle pouvait servir
   /* OPTIONAL: Sender history */
-  list_init(history_table);
-  memb_init(&history_mem); 
+  //list_init(history_table);
+  //memb_init(&history_mem); 
   
   //we turn on all the leds, turning on the leds means starting generation of fake data
   //leds_on(LEDS_ALL);

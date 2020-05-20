@@ -65,7 +65,7 @@ typedef struct Parent Parent;
 
 int n;
 
-static struct Child *head;
+static struct Child *head = NULL;
 static Parent parent;
 static bool pathToServer = false;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
@@ -142,21 +142,15 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   printf("Min: %d, sensor value: %d, child_conf:%d, msg: %s \n", min, val_sens, child_conf, msg);
   
 	if(child_conf){
-		//TODO add child to child's list
-		/*
-		const linkaddr_t me = {{from->u8[0], from->u8[1]}};
-		const linkaddr_t m2 = {{5,9}};
-		head = insert(head, me);
-		head = insert(head, m2);
-		printList(head);
-		*/
+		printf("Added child ! \n");
+		//Add child to child's list
+		const linkaddr_t child = {{from->u8[0], from->u8[1]}};
+		head = insert(head, child, clock_seconds());
 		//If new child is my parent, reset parent after adding child to child's list
 		if(linkaddr_cmp(from, &parent.addr) != 0){
 			printf("from: %d %d parent: %d %d \n", from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
 			printf("reset parent \n");
-			parent.addr.u8[0] = 0;
-			parent.addr.u8[1] = 0;
-			parent.valid = false;
+			resetParent();
 		}
 	}
   
@@ -206,29 +200,39 @@ static void broadcast_recv(struct broadcast_conn * c,const linkaddr_t * from) {
 	rss_val = cc2420_last_rssi; //RSS = Signal Strength
 	rss = rss_val+45; // Add 45 to RSS - read in documentation
 	printf("RSSI of Last Received Packet = %d dBm\n", rss);
-
-	if(rss > parent.rss && serverPath){ //TODO check node is not already a child
-		printf("new rssi better than %d dBm\n", parent.rss);
-		parent.addr.u8[0] = from->u8[0];
-		parent.addr.u8[1] = from->u8[1];
-		parent.rss = rss;
-		parent.valid = true;
-		pathToServer = true;
-		confirmChild = true;
+	
+	// Check if sender of broadcast is my child 
+	const linkaddr_t addr_from =  {{from->u8[0], from->u8[1]}};
+	printList(head);
+	if(!contains(head, addr_from)){ // If not, consider having it as parent 
+		if(rss > parent.rss && serverPath){
+			printf("new rssi better than %d dBm\n", parent.rss);
+			// Exit runicast process bc changing parent
+			//runicast_close(&runicast);
+			process_exit(&runicast_process); 
+			
+			parent.addr.u8[0] = from->u8[0];
+			parent.addr.u8[1] = from->u8[1];
+			parent.rss = rss;
+			parent.valid = true;
+			pathToServer = true;
+			confirmChild = true;
+			
+			// Starting runicast process for child confirmation and then data transmission
+			process_start(&runicast_process, NULL);
+		}
+		else{
+			printf("lower signal received or noth path to server detected !\n");
+		}
 	}
-	else{
-		printf("lower signal received or noth path to server detected !\n");
+	else{ // If yes, update "last update for child" 
+		printf("Not choosed as parent because it's my child ! \n");
+		//TODO update last_update for child
+		head = update(head, addr_from, clock_seconds());
 	}
 
 	if(parent.valid){
 		printf("Parent: %d.%d - RSS %d dBm \n", parent.addr.u8[0], parent.addr.u8[1], parent.rss);
-		
-		//we launch the runicast process thread only if it is not started yet
-		if(isRunicastStarted==0){ 
-			printf("ONLY ONCE");
-			process_start(&runicast_process, NULL);
-			isRunicastStarted = 1;
-		}
 	}
 }
 
@@ -241,7 +245,7 @@ static struct broadcast_conn broadcast;
 //-----------------------------------------------------------------
 PROCESS_THREAD(runicast_process, ev, data) {
 
-  PROCESS_EXITHANDLER(broadcast_close(&broadcast);); //TODO c'est pas correct ca si ?
+  PROCESS_EXITHANDLER(runicast_close(&runicast);); //TODO c'est pas correct ca si ?
   PROCESS_BEGIN(); 
 
   printf("RUNICAST STARTED\n");
@@ -252,10 +256,29 @@ PROCESS_THREAD(runicast_process, ev, data) {
   //Cette partie est utilisée pour runicast mais j'ai pas encore compris à quoi elle pouvait servir
   /* OPTIONAL: Sender history */
   list_init(history_table);
-  memb_init(&history_mem); 
+  memb_init(&history_mem);
   
-        //we turn on all the leds, turning on the leds means starting generation of fake data
-      leds_on(LEDS_ALL);
+  // Confirm childHood before starting sending data
+  ucPacket initSendPacket; 
+  initSendPacket.confirmChild = true;
+  initSendPacket.min = 0;
+  initSendPacket.valSensor = 0;
+  initSendPacket.actionValve = 0;
+  if(!runicast_is_transmitting(&runicast)) {
+
+      packetbuf_copyfrom( &initSendPacket, sizeof(initSendPacket));
+
+      printf("%u.%u: sending child_conf runicast to parent address %u.%u \n",
+	     linkaddr_node_addr.u8[0],
+	     linkaddr_node_addr.u8[1],
+	     parent.addr.u8[0],
+	     parent.addr.u8[1]);
+
+      runicast_send(&runicast, &parent.addr, MAX_RETRANSMISSIONS);
+    }
+  
+  //we turn on all the leds, turning on the leds means starting generation of fake data
+  leds_on(LEDS_ALL);
 
   while (1) {
 
@@ -276,9 +299,12 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
     leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
     
-     ucPacket sendPacket1; //Packet to send
-     ucPacket sendPacket = generate_random_data(sendPacket1);
-     printf("Packet: %d %d \n", sendPacket.min, sendPacket.valSensor);
+	ucPacket sendPacket1; //Packet to send
+	ucPacket sendPacket = generate_random_data(sendPacket1);
+	printf("Packet: %d %d \n", sendPacket.min, sendPacket.valSensor);
+	sendPacket.msg = "C"; //We send him the letter C representing the COMPUTE operation
+	sendPacket.confirmChild = false;
+	sendPacket.actionValve = 0;
 
      //the clock_s is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
     clock_s++;
@@ -286,26 +312,18 @@ PROCESS_THREAD(runicast_process, ev, data) {
     if(clock_s == 31){
       clock_s = 1;
     }
-    sendPacket.msg = "C"; //We send him the letter C representing the COMPUTE operation
-	sendPacket.confirmChild = confirmChild;
-	confirmChild = false;
 	
-   if(!runicast_is_transmitting(&runicast)) {
-      linkaddr_t recv;
+    if(!runicast_is_transmitting(&runicast)) {
 
-      packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
-      recv.u8[0] = parent.addr.u8[0];
-      recv.u8[1] = parent.addr.u8[1];
+       packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
 
-      printf("%u.%u: sending runicast to parent address %u.%u - Packet %d %d \n",
+       printf("%u.%u: sending runicast to parent address %u.%u - Packet %d %d \n",
 	     linkaddr_node_addr.u8[0],
 	     linkaddr_node_addr.u8[1],
-	     recv.u8[0],
-	     recv.u8[1], sendPacket.min, sendPacket.valSensor);
+	     parent.addr.u8[0], parent.addr.u8[1], sendPacket.min, sendPacket.valSensor);
 
-      runicast_send(&runicast, &recv, MAX_RETRANSMISSIONS);
+       runicast_send(&runicast, &parent.addr, MAX_RETRANSMISSIONS);
     }
-
   }
 
 PROCESS_END();
@@ -340,31 +358,32 @@ PROCESS_THREAD(openValve_process, ev, data)
 
 PROCESS_THREAD(broadcast_process, ev, data)
 {
-  PROCESS_BEGIN(); 
-  printf("PROCESS LANCE\n");
-  resetParent();
+	PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
+	PROCESS_BEGIN(); 
+	printf("PROCESS LANCE\n");
+	resetParent();
 
-  broadcast_open(&broadcast, 129, &broadcast_call);
-
+	broadcast_open(&broadcast, 129, &broadcast_call);
+	
     while (1) {
 	
-    //Timer handling the rate at which we'll send the DISCOVER message	
-    static struct etimer etBroadcast;
-    etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
-    
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //Wait for timer to end
-   
-    broadcastPacket packet;
-    packet.src.u8[0] = linkaddr_node_addr.u8[0];
-    packet.src.u8[1] = linkaddr_node_addr.u8[1];
-    packet.msg = "Discover";
-    packet.hasPathToServer = pathToServer;	
-    packetbuf_copyfrom(&packet, sizeof(packet)); //Message to send to all reachable nodes
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent from Sensor Node\n");
+		//Timer handling the rate at which we'll send the DISCOVER message	
+		static struct etimer etBroadcast;
+		etimer_set(&etBroadcast,10*CLOCK_SECOND); //we send the message every 10 seconds
+		
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etBroadcast)); //Wait for timer to end
+	   
+		broadcastPacket packet;
+		packet.src.u8[0] = linkaddr_node_addr.u8[0];
+		packet.src.u8[1] = linkaddr_node_addr.u8[1];
+		packet.msg = "Discover";
+		packet.hasPathToServer = pathToServer;	
+		packetbuf_copyfrom(&packet, sizeof(packet)); //Message to send to all reachable nodes
+		broadcast_send(&broadcast);
+		printf("Broadcast message sent from Sensor Node\n");
 
-  }
+	}
 
-  PROCESS_END();
+	PROCESS_END();
 }
 

@@ -98,7 +98,7 @@ struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long t
          
         //if list is empty
         if(head == NULL) {
-            return;
+            return NULL;
         }
         
         //navigate through list

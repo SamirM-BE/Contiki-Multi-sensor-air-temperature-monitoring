@@ -80,7 +80,7 @@ void printListHello(struct Hello* head) {
 
    //start from the beginning
    while(ptr != NULL) {
-      printf("ADDRESS %d:%d RSS %d DIST TO SERVER %d\n",ptr->addr.u8[0],ptr->addr.u8[1], ptr->rss, ptr-> dist_to_server);
+      printf("ADDRESS %d:%d RSS %d DIST %d\n",ptr->addr.u8[0],ptr->addr.u8[1], ptr->rss, ptr-> dist_to_server);
       ptr = ptr->next;
    }
 
@@ -106,55 +106,49 @@ int lengthHello(struct Hello* head) {
 
 //function that return the address corresponding to the biggest RSS, return NULL if the list is empty
 
-linkaddr_t* biggestRssHello(struct Hello* head){
+struct Hello* biggestRssHello(struct Hello* head){
 	
 	//start from the first link
    struct Hello* current = head;
+   struct Hello* best = NULL;
    
-   int bigRSS = INT_MIN;
-   int distSmall = INT_MAX;
-   linkaddr_t bestAddr = {{0,0}};
+   best->rss = INT_MIN;
+   best->dist_to_server = INT_MAX;
    
-   
-   
+   //int bigRSS = INT_MIN;
+   //int distSmall = INT_MAX;
+   //linkaddr_t bestAddr = {{0,0}};
 
    //if list is empty
-   /*
    if(head == NULL) {
-      return NULL;
+      return best;
    }
-    * 
-	* */
    
    while(current != NULL){
 	   //si le RSS est plus grand
-	   if(current -> rss > bigRSS){
-		   bigRSS = current -> rss;
-		   distSmall = current -> dist_to_server;
-		   bestAddr.u8[0] = current->addr.u8[0];
-		   bestAddr.u8[1] = current->addr.u8[1];
-		   
+	   if(current->rss > best->rss){
+		   best->rss = current->rss;
+		   best->dist_to_server = current->dist_to_server;
+		   best->addr.u8[0] = current->addr.u8[0];
+		   best->addr.u8[1] = current->addr.u8[1];
 		   
 		   //bestAddr = {{current->addr.u8[0], current->addr.u8[1]}};
-	   } if(current -> rss == bigRSS){ // si les deux RSS sont égaux, on regarde pour prendre le plus petit dist_to_server
-		   if(current -> dist_to_server <= distSmall){
-		    bigRSS = current -> rss;
-			distSmall = current -> dist_to_server;
-			bestAddr.u8[0] = current->addr.u8[0];
-			bestAddr.u8[1] = current->addr.u8[1];
+	   }
+	   else if(current->rss == best->rss){ // si les deux RSS sont égaux, on regarde pour prendre le plus petit dist_to_server
+		   if(current->dist_to_server <= best->dist_to_server){
+		    best->rss = current->rss;
+			best->dist_to_server = current->dist_to_server;
+			best->addr.u8[0] = current->addr.u8[0];
+			best->addr.u8[1] = current->addr.u8[1];
 		    //bestAddr = {{current->addr.u8[0], current->addr.u8[1]}};
 		   }
-		   
 	   }
-	   current = current -> next; // we move on to the next node
+	   current = current->next; // we move on to the next node
    }
-    
-    
-   
+
    //we return the address of the best node
    //return bestAddr;
-   return &bestAddr;
-	
+   return best;
 }
  
 

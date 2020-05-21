@@ -10,6 +10,7 @@
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
 #include "../PROJECT1/mobileP2/linkedList.h" // Handle linkedlist
+#include "../PROJECT1/mobileP2/linkedListHello.h" // Handle linkedlist
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 4 //for runicast
@@ -90,6 +91,8 @@ struct Node
 
 /* ----- STATIC VARIABLES -------- */
 static struct Child *head = NULL;
+static struct Hello *headHello = NULL; // List of Hello packet received
+//static struct Lost *headLost = NULL; // List of Lost packet received
 static struct Node me;
 static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
@@ -181,16 +184,17 @@ static void timeout_runicast_lost(struct runicast_conn *c, const linkaddr_t *fro
 
 // the hello message we received in broadcast
 static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * from) {
-    if(me.dist_to_server == INT_MAX && allow_recv_hello){ // equivalent to say that the node does not have parent yet and just spawned in an existing network        
-        int rss;
+	if(me.dist_to_server == INT_MAX && allow_recv_hello){ // equivalent to say that the node does not have parent yet and just spawned in an existing network        
+        printf("add addr to linked list \n");
+		int rss;
         static signed char rss_val; 
     
         rss_val = cc2420_last_rssi; //RSS = Signal Strength
         rss = rss_val+45; // Add 45 to RSS - read in documentation
 
 		struct BROADCAST_ROUTING *routing_packet = (struct BROADCAST_ROUTING*) packetbuf_dataptr();
-		//headHello = insertHello(headHello, routing_packet->addr, rss, routing_packet->dist_to_server);
-		//TODO insert in hello list
+		headHello = insertHello(headHello, routing_packet->addr, rss, routing_packet->dist_to_server);
+		printListHello(headHello);
 	}
 }
 
@@ -256,18 +260,22 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 			broadcast_send(&broadcast_routing_conn);
 			printf("Hello message sent \n");
 		}
+		else{
+			PROCESS_WAIT_EVENT_UNTIL(0);
+		}
 	}
 	
 	PROCESS_END();
 }
 
 PROCESS_THREAD(recv_hello_process, ev, data){
+	PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
 	PROCESS_BEGIN();
 	printf("Process recv hello started \n");
 	
 	// Timer init
 	static struct etimer allow_recv;
-	etimer_set(&allow_recv, 3*CLOCK_SECOND);
+	etimer_set(&allow_recv, 20*CLOCK_SECOND);
 	
 	// Allow receive hello message
 	// TODO empty hello_message_list
@@ -276,10 +284,11 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 	allow_recv_hello = false;
 	
 	//handle linked list
-	//parent.addr = biggestRSS(headHello);
-	//parent.rss = rss;
-	//parent.dist_to_server = routing_packet->dist_to_server;
-	//me.dist_to_server = parent.dist_to_server +1 ;
+	struct Hello *newHello = biggestRssHello(headHello);
+	parent.addr = newHello->addr;
+	parent.rss = newHello->rss;
+	parent.dist_to_server = newHello->dist_to_server;
+	me.dist_to_server = parent.dist_to_server +1 ;
 	printf("Parent: %d.%d - new_dist: %d \n", parent.addr.u8[0], parent.addr.u8[1], me.dist_to_server);
 		 
 		 

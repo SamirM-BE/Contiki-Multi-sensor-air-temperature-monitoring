@@ -9,6 +9,7 @@
 #include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
+#include "dev/serial-line.h"
 
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
@@ -18,7 +19,8 @@
 //-----------------------------------------------------------------   
 PROCESS(runicast_process, "runicast mechanism, handle the toggling of the light every 1 minute too");
 PROCESS(broadcast_process, "broadcast mechanism");
-AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
+PROCESS(test_serial, "Serial line test process");
+AUTOSTART_PROCESSES(&broadcast_process, &runicast_process, &test_serial);
 
 /*----------------------------------runicast section-----------------------------------------*/
 /* OPTIONAL: Sender history.
@@ -107,11 +109,20 @@ static void recv_runicast(struct runicast_conn *c, const linkaddr_t *from, uint8
   ucPacket* received_packet = (ucPacket*) packetbuf_dataptr();
   char* msg = received_packet->msg;
   bool child_conf = received_packet->confirmChild;
-  int min = received_packet->min;
-  int val_sens = received_packet->valSensor;
+  int minute = received_packet->min;
+  int temperature = received_packet->valSensor;
   bool actionValve = received_packet->actionValve;
+  //TEMPORARY
+  linkaddr_t sensor_addr;
+  sensor_addr.u8[0] = 6;
+  sensor_addr.u8[1] = 9;
+  
+  //TODO:  put source address in the packet
+  //We should have something like : 
+  // received_packet->sensor_addr.u8[0], received_packet->sensor_addr.u8[1]
+   printf("DATA: %d.%d, %d, %d\n", sensor_addr.u8[0], sensor_addr.u8[1], minute, temperature);
 
-  printf("Min: %d, sensor value: %d, child_conf:%d, msg: %s \n", min, val_sens, child_conf, msg); 
+  printf("Min: %d, sensor value: %d, child_conf:%d, msg: %s \n", minute, temperature, child_conf, msg); 
 }
 
 static void sent_runicast(struct runicast_conn *c, const linkaddr_t *to, uint8_t retransmissions)
@@ -227,3 +238,19 @@ PROCESS_THREAD(broadcast_process, ev, data)
 
   PROCESS_END();
 }
+
+PROCESS_THREAD(test_serial, ev, data)
+ {
+   PROCESS_BEGIN();
+	
+   for(;;) {   
+     PROCESS_YIELD();
+     if(ev == serial_line_event_message) {
+       printf("%s\n", (char *)data);
+	   
+	   if(strcmp((char *) data, "openValve")==0)
+		   printf("OUVERTURE DES VALVES !!!\n");
+     }
+   }
+   PROCESS_END();
+ }

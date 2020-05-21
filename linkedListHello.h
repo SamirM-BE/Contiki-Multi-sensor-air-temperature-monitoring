@@ -112,11 +112,11 @@ struct Hello* biggestRssHello(struct Hello* head){
    struct Hello* current = head;
    struct Hello* best = NULL;
    
-   best->rss = INT_MIN;
-   best->dist_to_server = INT_MAX;
+   //bigRSS = INT_MIN;
+   //distSmall = INT_MAX;
    
-   //int bigRSS = INT_MIN;
-   //int distSmall = INT_MAX;
+   int bigRSS = INT_MIN;
+   int distSmall = INT_MAX;
    //linkaddr_t bestAddr = {{0,0}};
 
    //if list is empty
@@ -126,28 +126,36 @@ struct Hello* biggestRssHello(struct Hello* head){
    
    while(current != NULL){
 	   //si le RSS est plus grand
-	   if(current->rss > best->rss){
-		   best->rss = current->rss;
-		   best->dist_to_server = current->dist_to_server;
+	   if(current->rss > bigRSS){
+		   printf("CURR RSS %d\n", current -> rss);
+		   printf("BEST RSS avant %d\n", bigRSS);
+		   printf("CURR DIST avant %d\n", current -> dist_to_server);
+		   printf("BEST DIST avant %d\n", distSmall);
+		   bigRSS = current -> rss; 
+		   
+		   printf("BEST RSS apres %d\n", bigRSS);
+		   distSmall = current->dist_to_server;
+		   printf("BEST DIST apres %d\n", current -> dist_to_server);
 		   best->addr.u8[0] = current->addr.u8[0];
 		   best->addr.u8[1] = current->addr.u8[1];
-		   
-		   //bestAddr = {{current->addr.u8[0], current->addr.u8[1]}};
 	   }
-	   else if(current->rss == best->rss){ // si les deux RSS sont égaux, on regarde pour prendre le plus petit dist_to_server
-		   if(current->dist_to_server <= best->dist_to_server){
-		    best->rss = current->rss;
-			best->dist_to_server = current->dist_to_server;
+	   else if(current->rss == bigRSS){ // si les deux RSS sont égaux, on regarde pour prendre le plus petit dist_to_server
+	       printf("RENTRE ICI CAR RSS EGAUX\n");
+		   if(current->dist_to_server <= distSmall){
+		    bigRSS = current->rss;
+			distSmall = current->dist_to_server;
 			best->addr.u8[0] = current->addr.u8[0];
 			best->addr.u8[1] = current->addr.u8[1];
-		    //bestAddr = {{current->addr.u8[0], current->addr.u8[1]}};
 		   }
 	   }
+	   printf("MOVE NEXT NODE\n");
 	   current = current->next; // we move on to the next node
    }
+   
+   best-> rss = bigRSS;
+   best-> dist_to_server = distSmall;
 
-   //we return the address of the best node
-   //return bestAddr;
+   //we return the best selected node
    return best;
 }
  

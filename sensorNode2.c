@@ -92,7 +92,7 @@ struct Node
 /* ----- STATIC VARIABLES -------- */
 static struct Child *headChild = NULL;
 static struct Hello *headHello = NULL; // List of Hello packet received
-//static struct Lost *headLost = NULL; // List of Lost packet received
+static struct Lost *headLost = NULL; // List of Lost packet received
 static struct Node me;
 static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
@@ -165,8 +165,8 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 // Received routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
 	printf("Child info received ! \n");
-	
-	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
+
+struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
 	
 	// Adding child to child's list
 	headChild = insert(headChild, packet->addr, clock_seconds());
@@ -186,19 +186,20 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 // Receivred lost runicast
 static void recv_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
 	printf("Runicast lost received \n");
-	
-	struct RUNICAST_LOST *packet = packetbuf_dataptr();
-	// Adding packet with lower or egal dist_to_server - preventing from choosing possible child as parent and form a loop
-	if(packet->dist_to_server <= me.dist_to_server){
-		printf("LOST - add addr to linkedlist \n");
-		int rss;
-        static signed char rss_val; 
-    
-        rss_val = cc2420_last_rssi; //RSS = Signal Strength
-        rss = rss_val+45; // Add 45 to RSS - read in documentation
+	if(allow_recv_lost){
+		struct RUNICAST_LOST *packet = packetbuf_dataptr();
+		// Adding packet with lower or egal dist_to_server - preventing from choosing possible child as parent and form a loop
+		if(packet->dist_to_server <= me.dist_to_server){
+			printf("LOST - add addr to linkedlist \n");
+			int rss;
+			static signed char rss_val; 
+		
+			rss_val = cc2420_last_rssi; //RSS = Signal Strength
+			rss = rss_val+45; // Add 45 to RSS - read in documentation
 
-		//headLost = insertLost(headLost, packet->addr, rss, packet->dist_to_server);
-		//printListLost(headLost);
+			headLost = insertLost(headLost, packet->addr, rss, packet->dist_to_server);
+			printListLost(headLost);
+		}
 	}
 }
 
@@ -297,11 +298,11 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 	allow_recv_lost = false;
 	
 	//handle linked list
-	//struct Lost *newLost = choice(headLost);
-	//parent.addr = newLost->addr;
-	//parent.rss = newLost->rss;
-	//parent.dist_to_server = newLost->dist_to_server;
-	//parent.valid = true;
+	struct Lost *newLost = biggestRssLost(headLost);
+	parent.addr = newLost->addr;
+	parent.rss = newLost->rss;
+	parent.dist_to_server = newLost->dist_to_server;
+	parent.valid = true;
 	printf("New parent: %d.%d \n", parent.addr.u8[0], parent.addr.u8[1]);
 	
 	//send childConfirmation to parent

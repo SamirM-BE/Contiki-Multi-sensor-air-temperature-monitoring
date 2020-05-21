@@ -74,11 +74,11 @@ struct Child* insert(struct Child* head, linkaddr_t addr, unsigned long timestam
 
 void printList(struct Child* head) {
    struct Child *ptr = head;
-   printf("\n[ ");
+   printf("[ ");
 
    //start from the beginning
    while(ptr != NULL) {
-      printf("TRAVERSE %d:%d \n",ptr->addr.u8[0],ptr->addr.u8[1]);
+      printf("\n Child: %d:%d",ptr->addr.u8[0],ptr->addr.u8[1]);
       ptr = ptr->next;
    }
 
@@ -93,9 +93,6 @@ struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long t
         //start from the first link
         struct Child* current = head;
 
- 
-
-         
         //if list is empty
         if(head == NULL) {
             return NULL;
@@ -103,11 +100,9 @@ struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long t
         
         //navigate through list
         while(current->addr.u8[0] != addr.u8[0] || current->addr.u8[1] != addr.u8[1]) {
-       
-         //go to next link
-         current = current->next;
-   
-    }
+			//go to next link
+			current = current->next;
+		}
     //we arrives at the right node so here we can make the modification
     current -> timestamp = timestamp;
     return head;

@@ -10,13 +10,14 @@
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
 #include "../PROJECT1/mobileP2/linkedList.h" // Handle linkedlist
+#include "../PROJECT1/mobileP2/linkedListHello.h" // Handle linkedlist
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 4 //for runicast
 #define NUM_HISTORY_ENTRIES 4 //for runicast
 
 //-----------------------------------------------------------------   
-PROCESS(border_router_node_process, "sensor node process");
+PROCESS(border_router_node_process, "border router node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(openValve_process, "open the valve for 10 minutes");
 AUTOSTART_PROCESSES(&border_router_node_process, &broadcast_routing_process);
@@ -88,10 +89,12 @@ struct Node
 
 
 /* ----- STATIC VARIABLES -------- */
-static struct Child *head = NULL;
+static struct Child *headChild = NULL;
+static struct Hello *headHello = NULL; // List of Hello packet received
+//static struct Lost *headLost = NULL; // List of Lost packet received
 static struct Node me;
+static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
-static bool allow_recv_hello = false;
 
 static struct runicast_conn runicast_routing_conn;
 static struct runicast_conn runicast_lost_conn;
@@ -121,6 +124,12 @@ static struct RUNICAST_DATA generate_random_data(struct RUNICAST_DATA sendPacket
 	return sendPacket;
 }
 
+static void resetParent(){
+	parent.addr.u8[0] = 0;
+	parent.addr.u8[1] = 0;
+	parent.rss = INT_MIN;
+	parent.valid = false;
+}
 
 
 // the values of the sensor
@@ -149,6 +158,14 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 
 // Receivred routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	printf("Child info received ! \n");
+	
+	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
+	
+	// Adding child to child's list
+	headChild = insert(headChild, packet->addr, clock_seconds());
+	printList(headChild);
+	printf("Child %d.%d added \n", packet->addr.u8[0], packet->addr.u8[1]);
 }
 
 static void sent_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -173,17 +190,7 @@ static void timeout_runicast_lost(struct runicast_conn *c, const linkaddr_t *fro
 
 // the hello message we received in broadcast
 static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * from) {
-    if(me.dist_to_server == INT_MAX && allow_recv_hello){ // equivalent to say that the node does not have parent yet and just spawned in an existing network        
-        int rss;
-        static signed char rss_val; 
-    
-        rss_val = cc2420_last_rssi; //RSS = Signal Strength
-        rss = rss_val+45; // Add 45 to RSS - read in documentation
-
-		struct BROADCAST_ROUTING *routing_packet = (struct BROADCAST_ROUTING*) packetbuf_dataptr();
-		//headHello = insertHello(headHello, routing_packet->addr, rss, routing_packet->dist_to_server);
-		//TODO insert in hello list
-	}
+	
 }
 
 // broadcast message received when another node lost his parent because we are here for solidarity :D  
@@ -248,6 +255,9 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 			broadcast_send(&broadcast_routing_conn);
 			printf("Hello message sent \n");
 		}
+		else{
+			PROCESS_WAIT_EVENT_UNTIL(0);
+		}
 	}
 	
 	PROCESS_END();
@@ -258,6 +268,7 @@ PROCESS_THREAD(border_router_node_process, ev, data)
 	// Init me node
 	me.addr = linkaddr_node_addr;
 	me.dist_to_server = 1;
+
 	
 	
 	// Handling exit connexions
@@ -270,13 +281,15 @@ PROCESS_THREAD(border_router_node_process, ev, data)
 	PROCESS_BEGIN(); 
 	printf("Border Router Node Process runing \n");
 	
+	resetParent();
+	
 	// Open connexions
 	broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);
 	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
 	runicast_open(&runicast_lost_conn, 154, &runicast_lost_callbacks);
 	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
 	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
-	
+		
 	
 	PROCESS_END();
 }

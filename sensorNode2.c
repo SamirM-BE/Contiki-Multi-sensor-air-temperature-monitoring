@@ -90,7 +90,7 @@ struct Node
 
 
 /* ----- STATIC VARIABLES -------- */
-static struct Child *head = NULL;
+static struct Child *headChild = NULL;
 static struct Hello *headHello = NULL; // List of Hello packet received
 //static struct Lost *headLost = NULL; // List of Lost packet received
 static struct Node me;
@@ -160,6 +160,14 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 
 // Receivred routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	printf("Child info received ! \n");
+	
+	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
+	
+	// Adding child to child's list
+	headChild = insert(headChild, packet->addr, clock_seconds());
+	printList(headChild);
+	printf("Child %d.%d added \n", packet->addr.u8[0], packet->addr.u8[1]);
 }
 
 static void sent_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -278,7 +286,7 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 	etimer_set(&allow_recv, 20*CLOCK_SECOND);
 	
 	// Allow receive hello message
-	// TODO empty hello_message_list
+	headHello = NULL;
 	allow_recv_hello = true;
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
 	allow_recv_hello = false;
@@ -290,7 +298,15 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 	parent.dist_to_server = newHello->dist_to_server;
 	me.dist_to_server = parent.dist_to_server +1 ;
 	printf("Parent: %d.%d - new_dist: %d \n", parent.addr.u8[0], parent.addr.u8[1], me.dist_to_server);
-		 
+	
+	//send childConfirmation to parent
+	struct RUNICAST_ROUTING sendPacket;
+	sendPacket.addr = me.addr;
+	sendPacket.isChild = true;
+	
+	packetbuf_clear();
+	packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
+	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
 		 
 	printf("Exiting recv hello process \n");
 	process_exit(&recv_hello_process);
@@ -326,7 +342,7 @@ PROCESS_THREAD(sensor_node_process, ev, data)
 	runicast_open(&runicast_lost_conn, 154, &runicast_lost_callbacks);
 	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
 	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
-	
+		
 	
 	PROCESS_END();
 }

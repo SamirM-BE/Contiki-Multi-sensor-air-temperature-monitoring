@@ -16,11 +16,10 @@
 #define NUM_HISTORY_ENTRIES 4 //for runicast
 
 //-----------------------------------------------------------------   
-PROCESS(sensor_node_process, "sensor node process");
+PROCESS(border_router_node_process, "sensor node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
-PROCESS(recv_hello_process, "recv hello process");
 PROCESS(openValve_process, "open the valve for 10 minutes");
-AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
+AUTOSTART_PROCESSES(&border_router_node_process, &broadcast_routing_process);
 //-----------------------------------------------------------------
 
 /*----------------------------------runicast section-----------------------------------------*/
@@ -91,7 +90,6 @@ struct Node
 /* ----- STATIC VARIABLES -------- */
 static struct Child *head = NULL;
 static struct Node me;
-static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
 static bool allow_recv_hello = false;
 
@@ -123,12 +121,6 @@ static struct RUNICAST_DATA generate_random_data(struct RUNICAST_DATA sendPacket
 	return sendPacket;
 }
 
-static void resetParent(){
-	parent.addr.u8[0] = 0;
-	parent.addr.u8[1] = 0;
-	parent.rss = INT_MIN;
-	parent.valid = false;
-}
 
 
 // the values of the sensor
@@ -261,42 +253,11 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 	PROCESS_END();
 }
 
-PROCESS_THREAD(recv_hello_process, ev, data){
-	PROCESS_BEGIN();
-	printf("Process recv hello started \n");
-	
-	// Timer init
-	static struct etimer allow_recv;
-	etimer_set(&allow_recv, 3*CLOCK_SECOND);
-	
-	// Allow receive hello message
-	// TODO empty hello_message_list
-	allow_recv_hello = true;
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
-	allow_recv_hello = false;
-	
-	//handle linked list
-	//parent.addr = biggestRSS(headHello);
-	//parent.rss = rss;
-	//parent.dist_to_server = routing_packet->dist_to_server;
-	//me.dist_to_server = parent.dist_to_server +1 ;
-	printf("Parent: %d.%d - new_dist: %d \n", parent.addr.u8[0], parent.addr.u8[1], me.dist_to_server);
-		 
-		 
-	printf("Exiting recv hello process \n");
-	process_exit(&recv_hello_process);
-	
-	PROCESS_END()
-}
-
-PROCESS_THREAD(sensor_node_process, ev, data)
+PROCESS_THREAD(border_router_node_process, ev, data)
 {
 	// Init me node
 	me.addr = linkaddr_node_addr;
-	me.dist_to_server = INT_MAX;
-	
-	// Allow recv hello message to find parent and dist
-	process_start(&recv_hello_process, NULL); 
+	me.dist_to_server = 1;
 	
 	
 	// Handling exit connexions
@@ -307,9 +268,7 @@ PROCESS_THREAD(sensor_node_process, ev, data)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
 	
 	PROCESS_BEGIN(); 
-	printf("Sensor Node Process runing \n");
-	
-	resetParent();
+	printf("Border Router Node Process runing \n");
 	
 	// Open connexions
 	broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);

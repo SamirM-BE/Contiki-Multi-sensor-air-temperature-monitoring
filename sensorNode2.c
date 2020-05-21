@@ -24,6 +24,7 @@ PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(broadcast_lost_process, "lost broadcast");
 PROCESS(recv_hello_process, "recv hello process");
 PROCESS(openValve_process, "open the valve for 10 minutes");
+PROCESS(children_alive_process, "remove dead child from child's list");
 AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
 
 
@@ -144,10 +145,10 @@ static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 }
 
 static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
-	printf("Runicast data timeout \n");
-	//parent down
-	//TODO resetParent
-	//TODO lostMode
+	printf("Runicast data timeout - Parent %d.%d down \n", parent.addr.u8[0], parent.addr.u8[1]);
+		
+	resetParent();
+	process_start(&broadcast_lost_process, NULL);
 }
  
 // the action to open the valve for 10 minutes coming from the computational node or the server
@@ -252,8 +253,7 @@ static const struct runicast_callbacks runicast_action_callbacks = {recv_runicas
 
 /* -------- PROCESSES ------- */ 
 
-PROCESS_THREAD(openValve_process, ev, data)
-{
+PROCESS_THREAD(openValve_process, ev, data){
 	PROCESS_BEGIN(); 
 	printf("OpenValve process launched ! \n");
 
@@ -273,6 +273,22 @@ PROCESS_THREAD(openValve_process, ev, data)
 	//process_start(&runicast_process, NULL);
 	// isRunicastStarted = 1; //we don't forget to set the isRunicastStarted variable to 0
 	PROCESS_EXIT();//ensuite on exit le process sinon il va toggle toutes les 5 secondes car le process restera actif pour tjs
+	PROCESS_END();
+}
+
+PROCESS_THREAD(children_alive_process, ev, data){
+	PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn);)
+	PROCESS_BEGIN();
+	printf("Child is alive verification process started \n");
+	
+	static struct etimer check_interval;
+	
+	while(1){
+		etimer_set(&check_interval, 10*CLOCK_SECOND);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&check_interval));
+		headChild = deleteOldChild(headChild);
+	}
+	
 	PROCESS_END();
 }
 
@@ -313,7 +329,8 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 	packetbuf_clear();
 	packetbuf_copyfrom(&sendPacketChild, sizeof(sendPacketChild));
 	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
-		 
+	
+	printf("Exiting lost mode !\n");
 	PROCESS_END();
 }
 
@@ -324,10 +341,12 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 	printf("Broadcast routing begin ! \n");
 	
 	broadcast_open(&broadcast_routing_conn, 129, &broadcast_routing_callbacks);
+	PROCESS_WAIT_EVENT_UNTIL(1); // Necessary (but we don't understand why)
 	
 	static struct etimer hello_timer;
 	while(1){
 		if(me.dist_to_server != INT_MAX){
+			printf("Begining to broadcast ! \n");
 			etimer_set(&hello_timer, 10*CLOCK_SECOND);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&hello_timer));
 			
@@ -340,9 +359,6 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 			
 			broadcast_send(&broadcast_routing_conn);
 			printf("Hello message sent \n");
-		}
-		else{
-			PROCESS_WAIT_EVENT_UNTIL(0);
 		}
 	}
 	
@@ -416,6 +432,5 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
 	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
 		
-	
 	PROCESS_END();
 }

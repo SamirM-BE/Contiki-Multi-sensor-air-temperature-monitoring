@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "net/rime/rime.h"
 #include "contiki.h"
+#define MAX_INTERVAL_KEEPALIVE 5
 
 struct Child
 {
@@ -51,25 +52,21 @@ struct Child* insert(struct Child* head, linkaddr_t addr, unsigned long timestam
     //if the element is already in the list we do not add it again
     //we first need to veryfy if the list contains the address
     bool test = contains(head, addr);
-    if(test == true){
+    if(test){
         return head;
     }
-   //create a child
-   struct Child *child = (struct Child*) malloc(sizeof(struct Child));
+	
+	//create a child
+	struct Child *child = (struct Child*) malloc(sizeof(struct Child));
 
-   child->addr.u8[0] = addr.u8[0];
-   child->addr.u8[1] = addr.u8[1];
-   child->timestamp = timestamp;
+	child->addr.u8[0] = addr.u8[0];
+	child->addr.u8[1] = addr.u8[1];
+	child->timestamp = timestamp;
+   
+	child->next = head; //point it to old first node
+	head = child; //point first to new first node
 
-   //printf("Val de addr de child %d and %d \n : ", child->addr.u8[0], child->addr.u8[1]);
-
-   //point it to old first node
-   child->next = head;
-
-   //point first to new first node
-   head = child;
-   //printf("Val de addr de head %d and %d \n : ", head->addr.u8[0], head->addr.u8[1]);
-   return head;
+	return head;
 }
 
 void printList(struct Child* head) {
@@ -109,7 +106,6 @@ struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long t
   }
 }
 
-
 //delete a link with given key
 struct Child* delete(struct Child *head, const linkaddr_t addr) {
 
@@ -124,34 +120,52 @@ struct Child* delete(struct Child *head, const linkaddr_t addr) {
 
    //navigate through list
    while(current->addr.u8[0] != addr.u8[0] && current->addr.u8[1] != addr.u8[1]){
-
       //if it is last node
       if(current->next == NULL) {
          return NULL;
       } else {
-         //store reference to current link
-         previous = current;
-         //move to next link
-         current = current->next;
+         previous = current; //store reference to current link
+         current = current->next; //move to next link
       }
    }
 
    //found a match, update the link
    if(current == head) {
-      //change first to point to next link
-      head = head->next;
+      head = head->next; //change first to point to next link
    } else {
-      //bypass the current link
-      previous->next = current->next;
+      previous->next = current->next; //bypass the current link
    }    
 
    return current;
+}
+
+struct Child* deleteOldChild(struct Child *head){
+	struct Child *ptr = head;
+
+	//start from the beginning
+	while(ptr != NULL) {
+		unsigned long interval = clock_seconds() - ptr->timestamp;
+		if(interval > MAX_INTERVAL_KEEPALIVE){
+			//Child seems probably down - remove from list
+			printf("Delete Child %d.%d \n", ptr->addr.u8[0], ptr->addr.u8[1]);
+			struct Child *newHead = delete(head, ptr->addr);
+			return deleteOldChild(newHead);
+		}
+		if(ptr->next == NULL){
+			return head;
+		}
+		else{
+			ptr = ptr->next;
+		}
+	}
+
 }
 
 //is list empty
 bool isEmpty(struct Child* head) {
    return head == NULL;
 }
+
 //return the length of the linked list
 int length(struct Child* head) {
    int length = 0;

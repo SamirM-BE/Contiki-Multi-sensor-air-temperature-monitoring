@@ -143,8 +143,6 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	printf("RECIVED RUNICAST DATA\n");
 	//tu récup le paquet, tu modifies le champs, 
 	//on set le le boolean forwarded à true
-	
-	
 }
 
 static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -153,7 +151,8 @@ static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 
 static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast data timeout - Parent %d.%d down \n", parent.addr.u8[0], parent.addr.u8[1]);
-		
+	
+	process_exit(&runicast_data_process);
 	resetParent();
 	process_start(&broadcast_lost_process, NULL);
 }
@@ -174,7 +173,7 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
 	printf("Child info received ! \n");
 
-struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
+	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
 	
 	// Adding child to child's list
 	headChild = insert(headChild, packet->addr, clock_seconds());
@@ -337,6 +336,9 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 	packetbuf_copyfrom(&sendPacketChild, sizeof(sendPacketChild));
 	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
 	
+	// Starting data process
+	process_start(&runicast_data_process, NULL);
+	
 	printf("Exiting lost mode !\n");
 	PROCESS_END();
 }
@@ -404,7 +406,10 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 	packetbuf_clear();
 	packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
 	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
-		 
+	
+	// Starting data process
+	process_start(&runicast_data_process, NULL);
+	
 	printf("Exiting recv hello process \n");
 	process_exit(&recv_hello_process);
 	

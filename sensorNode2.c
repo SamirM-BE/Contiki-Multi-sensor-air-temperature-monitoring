@@ -23,8 +23,9 @@ PROCESS(sensor_node_process, "sensor node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(broadcast_lost_process, "lost broadcast");
 PROCESS(recv_hello_process, "recv hello process");
+PROCESS(runicast_data_process, "send runicast data");
 PROCESS(openValve_process, "open the valve for 10 minutes");
-AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
+AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process, &runicast_data_process);
 
 
 /* ------ RUNICAST STRUCTURE FOR DUPLICATES ----- */
@@ -98,6 +99,7 @@ static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
 static bool allow_recv_hello = false;
 static bool allow_recv_lost = false;
+static bool toToggle = false; //when we received the instruction to toggle the LED
 
 static struct runicast_conn runicast_routing_conn;
 static struct runicast_conn runicast_lost_conn;
@@ -137,6 +139,11 @@ static void resetParent(){
 
 // the values of the sensor
 static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	printf("RECIVED RUNICAST DATA\n");
+	//tu récup le paquet, tu modifies le champs, 
+	//on set le le boolean forwarded à true
+	
+	
 }
 
 static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -418,4 +425,74 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 		
 	
 	PROCESS_END();
+}
+
+PROCESS_THREAD(runicast_data_process, ev, data) {
+
+  PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn););
+  PROCESS_BEGIN(); 
+
+  printf("RUNICAST STARTED\n");
+
+
+  //Cette partie est utilisée pour runicast mais j'ai pas encore compris à quoi elle pouvait servir
+  /* OPTIONAL: Sender history */
+  list_init(history_table);
+  memb_init(&history_mem); 
+  
+   //we turn on all the leds, turning on the leds means starting generation of fake data
+   leds_on(LEDS_ALL);
+
+  while (1) {
+
+       //if we have to open the valve for 10 minutes coming from a statement from the computational node, we exit this process so we don't send value anymore to computational node
+       //this runicast activity will be resumed by the openValve process as soon as the 10 minutes delay will be done
+       //we make sure we turn off all the leds before
+	   /*
+      if(toToggle ==  true){
+        PROCESS_EXIT();
+      }
+	   * */
+
+      struct RUNICAST_DATA sendPacket;
+      sendPacket = generate_random_data(sendPacket);
+	  sendPacket.forwarded = false; //peut être à enlevé car elle va crée des complications non?
+	  sendPacket.addr= me.addr;
+
+	   //the clock is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
+      clock_s++;
+	  if(clock_s == 31){
+        clock_s = 1;
+      }
+
+     /*--------------timer handling section----------------*/ 
+	
+    static struct etimer etRunicast;
+    etimer_set(&etRunicast,CLOCK_SECOND); //timer d'une seconde
+    
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
+    //as soon as the time has expired, we can turn off the leds, that means we have finished the sampling
+    leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+
+
+   if(!runicast_is_transmitting(&runicast_data_conn)) {
+      linkaddr_t recv;
+
+      packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
+      recv.u8[0] = parent.addr.u8[0];
+      recv.u8[1] = parent.addr.u8[1];
+
+      printf("%u.%u: sending runicast to address %u.%u\n",
+	     linkaddr_node_addr.u8[0],
+	     linkaddr_node_addr.u8[1],
+	     recv.u8[0],
+	     recv.u8[1]);
+
+      runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS);
+    }
+
+   /*------end of section for runicast message sending-----*/
+  }
+
+PROCESS_END();
 }

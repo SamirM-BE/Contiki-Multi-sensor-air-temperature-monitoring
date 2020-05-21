@@ -11,6 +11,7 @@
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
 #include "../PROJECT1/mobileP2/linkedListChild.h" // Handle linkedlist
 #include "../PROJECT1/mobileP2/linkedListHello.h" // Handle linkedlist
+#include "../PROJECT1/mobileP2/linkedListLost.h" // Handle linkedlist
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 4 //for runicast

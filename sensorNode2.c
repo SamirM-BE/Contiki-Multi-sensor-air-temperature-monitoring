@@ -16,19 +16,17 @@
 #define MAX_RETRANSMISSIONS 4 //for runicast
 #define NUM_HISTORY_ENTRIES 4 //for runicast
 
-//-----------------------------------------------------------------   
+/* ------ PROCESSES DEFINITION ------ */
+
 PROCESS(sensor_node_process, "sensor node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(broadcast_lost_process, "lost broadcast");
 PROCESS(recv_hello_process, "recv hello process");
 PROCESS(openValve_process, "open the valve for 10 minutes");
 AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
-//-----------------------------------------------------------------
 
-/*----------------------------------runicast section-----------------------------------------*/
-/* OPTIONAL: Sender history.
- * Detects duplicate callbacks at receiving nodes.
- * Duplicates appear when ack messages are lost. */
+
+/* ------ RUNICAST STRUCTURE FOR DUPLICATES ----- */
 struct history_entry {
   struct history_entry *next;
   linkaddr_t addr;
@@ -110,10 +108,9 @@ static struct broadcast_conn broadcast_lost_conn;
 
 
 /* ----- FUNCTIONS ------ */
+
 static struct RUNICAST_DATA generate_random_data(struct RUNICAST_DATA sendPacket){
-	//we fill the packet with the value stored in the array
-	//si on a finit de mesurer pendant 30 min, on remet le i à zéro
-	//here we generate a random value between 1 and 100
+	//generate a random value between 1 and 100
 	int max_val = 100;
 	int min_val = 1;
 	int random_val = random_rand();
@@ -134,6 +131,8 @@ static void resetParent(){
 	parent.rss = INT_MIN;
 	parent.valid = false;
 }
+
+/* ------ CONNEXIONS FUNCTIONS ------ */
 
 // the values of the sensor
 static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -185,6 +184,21 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 
 // Receivred lost runicast
 static void recv_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	printf("Runicast lost received \n");
+	
+	struct RUNICAST_LOST *packet = packetbuf_dataptr();
+	// Adding packet with lower or egal dist_to_server - preventing from choosing possible child as parent and form a loop
+	if(packet->dist_to_server <= me.dist_to_server){
+		printf("LOST - add addr to linkedlist \n");
+		int rss;
+        static signed char rss_val; 
+    
+        rss_val = cc2420_last_rssi; //RSS = Signal Strength
+        rss = rss_val+45; // Add 45 to RSS - read in documentation
+
+		//headLost = insertLost(headLost, packet->addr, rss, packet->dist_to_server);
+		//printListLost(headLost);
+	}
 }
 
 static void sent_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -226,6 +240,7 @@ static void broadcast_lost_recv(struct broadcast_conn * c,const linkaddr_t * fro
 }
 
 /* ------ Static connexion's callbacks ------ */
+
 static const struct broadcast_callbacks broadcast_routing_callbacks = {broadcast_routing_recv};
 static const struct broadcast_callbacks broadcast_lost_callbacks = {broadcast_lost_recv};
 static const struct runicast_callbacks runicast_routing_callbacks = {recv_runicast_routing, sent_runicast_routing, timeout_runicast_routing};
@@ -272,7 +287,6 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 	packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
 	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
 		 
-	
 	static struct etimer allow_recv;
 	etimer_set(&allow_recv, 5*CLOCK_SECOND);
 	

@@ -160,6 +160,13 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 		/* Update existing history entry */
 		e->seq = seqno;
 	}
+
+	struct RUNICAST_DATA *packet = packetbuf_dataptr();
+   
+    	int a = packet->addr.u8[0];
+    	int b = packet->addr.u8[1];
+   
+    	printf("DATA from %d:%d with source %d:%d\n", from ->u8[0], from ->u8[1],a,b);
 }
 
 static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){

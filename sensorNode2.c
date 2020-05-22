@@ -167,13 +167,35 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 		/* Update existing history entry */
 		e->seq = seqno;
 	  }
-	//TODO when duplicates - this section is never reached ... 
+	
 	printf("RECIVED RUNICAST DATA from %d.%d seq: %d\n",  from->u8[0], from->u8[1], seqno);
-	//tu récup le paquet, tu modifies le champs, 
-	//on set le le boolean forwarded à true
+	
+	struct RUNICAST_DATA *packet = packetbuf_dataptr();
+   
+	//we update the timestamp of our child
+	const linkaddr_t ch = packet -> addr;
+	headChild = update(headChild, ch, clock_seconds());
+	
+	//as we are a sensor node, we have to set the forwarded boolean to true
+	packet->forwarded = true;
+	
+	linkaddr_t recv;
+	recv.u8[0] = parent.addr.u8[0];
+	recv.u8[1] = parent.addr.u8[1];
+	
+	//list_init(history_table);
+	//memb_init(&history_mem);
+	
+	// then we send the packet
+	//while(runicast_is_transmitting(&runicast_data_conn)){}
+	packetbuf_clear();
+	packetbuf_copyfrom(packet, sizeof(packet));
+	printf("Message form %d:%d forwareded to %d:%d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
+	runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS); //the second argument is the address of our parent wich is our parent
+
 }
 
-static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast data sent \n");
 }
 
@@ -181,9 +203,9 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
 	printf("Runicast data timeout - Parent %d.%d down \n", parent.addr.u8[0], parent.addr.u8[1]);
 	
 	process_exit(&runicast_data_process);
-	process_exit(&recv_lost_process);
+	//process_exit(&recv_lost_process);
 	resetParent();
-	process_start(&broadcast_lost_process, NULL);
+	//process_start(&broadcast_lost_process, NULL);
 }
  
 // the action to open the valve for 10 minutes coming from the computational node or the server
@@ -191,11 +213,11 @@ static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from
 	
 }
 
-static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast action sent \n");
 }
 
-static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t transmissions){
+static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast action timeout \n");
 }
 
@@ -211,7 +233,7 @@ static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *fro
 	printf("Child %d.%d added \n", packet->addr.u8[0], packet->addr.u8[1]);
 }
 
-static void sent_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+static void sent_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast routing sent \n");
 }
 
@@ -240,7 +262,7 @@ static void recv_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, 
 	}
 }
 
-static void sent_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+static void sent_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast lost sent \n");
 }
 
@@ -350,7 +372,7 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 		static struct etimer allow_recv;
 		etimer_set(&allow_recv, 120*CLOCK_SECOND);
 		
-		// headLost = NULL
+		headLost = NULL;
 		allow_recv_lost = true;
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
 		allow_recv_lost = false;
@@ -378,7 +400,7 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 			// Starting data process
 			process_start(&runicast_data_process, NULL);
 			// Start rcv lost process
-			process_start(&recv_lost_process, NULL);
+			//process_start(&recv_lost_process, NULL);
 			
 			printf("Exiting lost mode !\n");
 			PROCESS_EXIT();
@@ -461,7 +483,7 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 			// Starting data process
 			process_start(&runicast_data_process, NULL);
 			// Starting recv lost process
-			process_start(&recv_lost_process, NULL);
+			//process_start(&recv_lost_process, NULL);
 			
 			printf("Exiting recv hello process \n");
 			PROCESS_EXIT();
@@ -494,14 +516,10 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 	me.addr = linkaddr_node_addr;
 	me.dist_to_server = INT_MAX;
 	
-	// Allow recv hello message to find parent and dist
-	process_start(&recv_hello_process, NULL); 
-	
-	
 	// Handling exit connexions
-	PROCESS_EXITHANDLER(broadcast_close(&broadcast_lost_conn);)
+	//PROCESS_EXITHANDLER(broadcast_close(&broadcast_lost_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
-	PROCESS_EXITHANDLER(runicast_close(&runicast_lost_conn);)
+	//PROCESS_EXITHANDLER(runicast_close(&runicast_lost_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
 	
 	PROCESS_BEGIN(); 
@@ -512,8 +530,11 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 	// Open connexions
 	//broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);
 	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
-	runicast_open(&runicast_lost_conn, 154, &runicast_lost_callbacks);
+	//runicast_open(&runicast_lost_conn, 154, &runicast_lost_callbacks);
 	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
+
+	// Allow recv hello message to find parent and dist
+	process_start(&recv_hello_process, NULL); 
 
 	PROCESS_END();
 }
@@ -563,15 +584,13 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		/* OPTIONAL: Sender history */
 		list_init(history_table);
 		memb_init(&history_mem);
-		linkaddr_t recv;
+		
 		packetbuf_clear();
 		packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
-		recv.u8[0] = parent.addr.u8[0];
-		recv.u8[1] = parent.addr.u8[1];
 		
-		printf("Sending runicast to address %u.%u\n",recv.u8[0],recv.u8[1]);
+		printf("Sending runicast to address %u.%u\n",parent.addr.u8[0],parent.addr.u8[1]);
 
-		runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS);
+		runicast_send(&runicast_data_conn, &parent.addr, MAX_RETRANSMISSIONS);
 	}
 
 	PROCESS_END();

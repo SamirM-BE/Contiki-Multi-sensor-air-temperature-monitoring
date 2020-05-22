@@ -144,5 +144,4 @@ struct Hello* biggestRssHello(struct Hello* head){
    //we return the best selected node
    return best;
 }
- 
 

@@ -14,8 +14,8 @@
 #include "../PROJECT1/mobileP2/linkedListLost.h" // Handle linkedlist
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
-#define MAX_RETRANSMISSIONS 4 //for runicast
-#define NUM_HISTORY_ENTRIES 4 //for runicast
+#define MAX_RETRANSMISSIONS 10 //for runicast
+#define NUM_HISTORY_ENTRIES 10 //for runicast
 
 /* ------ PROCESSES DEFINITION ------ */
 
@@ -23,11 +23,13 @@ PROCESS(sensor_node_process, "sensor node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(broadcast_lost_process, "lost broadcast");
 PROCESS(recv_hello_process, "recv hello process");
+PROCESS(recv_lost_process, "recv lost process");
 PROCESS(runicast_data_process, "send runicast data");
 PROCESS(openValve_process, "open the valve for 10 minutes");
 PROCESS(children_alive_process, "remove dead child from child's list");
 AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
 
+//TODO gérer process children alive
 
 /* ------ RUNICAST STRUCTURE FOR DUPLICATES ----- */
 struct history_entry {
@@ -140,6 +142,33 @@ static void resetParent(){
 
 // the values of the sensor
 static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	/* OPTIONAL: Sender history */
+	struct history_entry *e = NULL;
+	for(e = list_head(history_table); e != NULL; e = e->next) {
+		if(linkaddr_cmp(&e->addr, from)) {
+			break;
+		}
+	}
+	if(e == NULL) {
+		/* Create new history entry */
+		e = memb_alloc(&history_mem);
+		if(e == NULL) {
+			e = list_chop(history_table); /* Remove oldest at full history */
+		}
+		linkaddr_copy(&e->addr, from);
+		e->seq = seqno;
+		list_push(history_table, e);
+	} 
+	else {
+		/* Detect duplicate callback */
+		if(e->seq == seqno) {
+			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
+			return;
+		}
+		/* Update existing history entry */
+		e->seq = seqno;
+	}
+	//TODO when duplicates - this section is never reached ... 
 	printf("RECIVED RUNICAST DATA\n");
 	//tu récup le paquet, tu modifies le champs, 
 	//on set le le boolean forwarded à true
@@ -153,12 +182,39 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
 	printf("Runicast data timeout - Parent %d.%d down \n", parent.addr.u8[0], parent.addr.u8[1]);
 	
 	process_exit(&runicast_data_process);
+	process_exit(&recv_lost_process);
 	resetParent();
 	process_start(&broadcast_lost_process, NULL);
 }
  
 // the action to open the valve for 10 minutes coming from the computational node or the server
 static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	/* OPTIONAL: Sender history */
+	struct history_entry *e = NULL;
+	for(e = list_head(history_table); e != NULL; e = e->next) {
+		if(linkaddr_cmp(&e->addr, from)) {
+			break;
+		}
+	}
+	if(e == NULL) {
+		/* Create new history entry */
+		e = memb_alloc(&history_mem);
+		if(e == NULL) {
+			e = list_chop(history_table); /* Remove oldest at full history */
+		}
+		linkaddr_copy(&e->addr, from);
+		e->seq = seqno;
+		list_push(history_table, e);
+	} 
+	else {
+		/* Detect duplicate callback */
+		if(e->seq == seqno) {
+			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
+			return;
+		}
+		/* Update existing history entry */
+		e->seq = seqno;
+	}
 }
 
 static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -171,6 +227,33 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 
 // Received routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	/* OPTIONAL: Sender history */
+	struct history_entry *e = NULL;
+	for(e = list_head(history_table); e != NULL; e = e->next) {
+		if(linkaddr_cmp(&e->addr, from)) {
+			break;
+		}
+	}
+	if(e == NULL) {
+		/* Create new history entry */
+		e = memb_alloc(&history_mem);
+		if(e == NULL) {
+			e = list_chop(history_table); /* Remove oldest at full history */
+		}
+		linkaddr_copy(&e->addr, from);
+		e->seq = seqno;
+		list_push(history_table, e);
+	} 
+	else {
+		/* Detect duplicate callback */
+		if(e->seq == seqno) {
+			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
+			return;
+		}
+		/* Update existing history entry */
+		e->seq = seqno;
+	}
+	
 	printf("Child info received ! \n");
 
 	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
@@ -192,6 +275,33 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 
 // Receivred lost runicast
 static void recv_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	/* OPTIONAL: Sender history */
+	struct history_entry *e = NULL;
+	for(e = list_head(history_table); e != NULL; e = e->next) {
+		if(linkaddr_cmp(&e->addr, from)) {
+			break;
+		}
+	}
+	if(e == NULL) {
+		/* Create new history entry */
+		e = memb_alloc(&history_mem);
+		if(e == NULL) {
+			e = list_chop(history_table); /* Remove oldest at full history */
+		}
+		linkaddr_copy(&e->addr, from);
+		e->seq = seqno;
+		list_push(history_table, e);
+	} 
+	else {
+		/* Detect duplicate callback */
+		if(e->seq == seqno) {
+			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
+			return;
+		}
+		/* Update existing history entry */
+		e->seq = seqno;
+	}
+	
 	printf("Runicast lost received \n");
 	if(allow_recv_lost){
 		struct RUNICAST_LOST *packet = packetbuf_dataptr();
@@ -236,12 +346,18 @@ static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * 
 
 // lost broadcast message received 
 static void broadcast_lost_recv(struct broadcast_conn * c,const linkaddr_t * from) {
+	printf("Broadcast lost recv \n");
 	if(parent.valid){
 		struct RUNICAST_LOST sendPacket;
 		sendPacket.addr = me.addr;
 		sendPacket.dist_to_server = me.dist_to_server;
 		
+		/* OPTIONAL: Sender history */
+		list_init(history_table);
+		memb_init(&history_mem); 
+		
 		// Sending lost runicast with our dist_to_server
+		while(runicast_is_transmitting(&runicast_lost_conn)){}
 		packetbuf_clear();
 		packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
 		runicast_send(&runicast_lost_conn, from, MAX_RETRANSMISSIONS);
@@ -298,51 +414,69 @@ PROCESS_THREAD(children_alive_process, ev, data){
 	PROCESS_END();
 }
 
+/* LOST PROCESS */
+// Send 1 Lost broadcast and allow receive lost runicast during 120sec
 PROCESS_THREAD(broadcast_lost_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_lost_conn);)
 	PROCESS_BEGIN()
 	printf("Process broadcast lost started \n");
 	
-	//Sending ONE broadcast Lost 
-	struct BROADCAST_LOST sendPacket;
-	sendPacket.addr = me.addr;
+	while(1){
+		printf("sending broadcast lost \n");
+		//Sending ONE broadcast Lost 
+		struct BROADCAST_LOST sendPacket;
+		sendPacket.addr = me.addr;
+		
+		packetbuf_clear();
+		packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
+		broadcast_send(&broadcast_lost_conn);
+			 
+		static struct etimer allow_recv;
+		etimer_set(&allow_recv, 120*CLOCK_SECOND);
+		
+		// headLost = NULL
+		allow_recv_lost = true;
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
+		allow_recv_lost = false;
+		
+		if(!isEmptyLost(headLost)){
+			//handle linked list
+			struct Lost *newLost = biggestRssLost(headLost);
+			parent.addr = newLost->addr;
+			parent.rss = newLost->rss;
+			parent.dist_to_server = newLost->dist_to_server;
+			parent.valid = true;
+			printf("New parent: %d.%d \n", parent.addr.u8[0], parent.addr.u8[1]);
+			
+			//send childConfirmation to parent
+			struct RUNICAST_ROUTING sendPacketChild;
+			sendPacketChild.addr = me.addr;
+			sendPacketChild.isChild = true;
+			
+			/* OPTIONAL: Sender history */
+			list_init(history_table);
+			memb_init(&history_mem); 
+			
+			while(runicast_is_transmitting(&runicast_routing_conn)){}
+			packetbuf_clear();
+			packetbuf_copyfrom(&sendPacketChild, sizeof(sendPacketChild));
+			runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
+			
+			// Starting data process
+			process_start(&runicast_data_process, NULL);
+			// Start rcv lost process
+			process_start(&recv_lost_process, NULL);
+			
+			printf("Exiting lost mode !\n");
+			PROCESS_EXIT();
+		}
+	}
 	
-	packetbuf_clear();
-	packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
-	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
-		 
-	static struct etimer allow_recv;
-	etimer_set(&allow_recv, 5*CLOCK_SECOND);
-	
-	// headLost = NULL
-	allow_recv_lost = true;
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
-	allow_recv_lost = false;
-	
-	//handle linked list
-	struct Lost *newLost = biggestRssLost(headLost);
-	parent.addr = newLost->addr;
-	parent.rss = newLost->rss;
-	parent.dist_to_server = newLost->dist_to_server;
-	parent.valid = true;
-	printf("New parent: %d.%d \n", parent.addr.u8[0], parent.addr.u8[1]);
-	
-	//send childConfirmation to parent
-	struct RUNICAST_ROUTING sendPacketChild;
-	sendPacketChild.addr = me.addr;
-	sendPacketChild.isChild = true;
-	
-	packetbuf_clear();
-	packetbuf_copyfrom(&sendPacketChild, sizeof(sendPacketChild));
-	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
-	
-	// Starting data process
-	process_start(&runicast_data_process, NULL);
-	
-	printf("Exiting lost mode !\n");
 	PROCESS_END();
 }
 
+/* ROUTING PROCESS */
+// Send Hello broadcast every 120sec
 PROCESS_THREAD(broadcast_routing_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
 	
@@ -355,8 +489,7 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 	static struct etimer hello_timer;
 	while(1){
 		if(me.dist_to_server != INT_MAX){
-			printf("Begining to broadcast ! \n");
-			etimer_set(&hello_timer, 10*CLOCK_SECOND);
+			etimer_set(&hello_timer, 120*CLOCK_SECOND);
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&hello_timer));
 			
 			struct BROADCAST_ROUTING broadcast_routing_packet;
@@ -374,48 +507,79 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 	PROCESS_END();
 }
 
+/* RECV HELLO MESSAGE PROCESS */
+// Allow receiving hello messages during 250sec
 PROCESS_THREAD(recv_hello_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
 	PROCESS_BEGIN();
 	printf("Process recv hello started \n");
 	
-	// Timer init
-	static struct etimer allow_recv;
-	etimer_set(&allow_recv, 20*CLOCK_SECOND);
-	
-	// Allow receive hello message
-	headHello = NULL;
-	allow_recv_hello = true;
-	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
-	allow_recv_hello = false;
-	
-	//handle linked list
-	struct Hello *newHello = biggestRssHello(headHello);
-	parent.addr = newHello->addr;
-	parent.rss = newHello->rss;
-	parent.dist_to_server = newHello->dist_to_server;
-	parent.valid = true;
-	me.dist_to_server = parent.dist_to_server +1 ;
-	printf("Parent: %d.%d - new_dist: %d \n", parent.addr.u8[0], parent.addr.u8[1], me.dist_to_server);
-	
-	//send childConfirmation to parent
-	struct RUNICAST_ROUTING sendPacket;
-	sendPacket.addr = me.addr;
-	sendPacket.isChild = true;
-	
-	packetbuf_clear();
-	packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
-	runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
-	
-	// Starting data process
-	process_start(&runicast_data_process, NULL);
-	
-	printf("Exiting recv hello process \n");
-	process_exit(&recv_hello_process);
+	while(1){
+		// Timer init
+		static struct etimer allow_recv;
+		etimer_set(&allow_recv, 250*CLOCK_SECOND);
+		
+		// Allow receive hello message
+		headHello = NULL;
+		allow_recv_hello = true;
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&allow_recv));
+		allow_recv_hello = false;
+		
+		//handle linked list
+		if(!isEmpty(headHello)){
+			struct Hello *newHello = biggestRssHello(headHello);
+			parent.addr = newHello->addr;
+			parent.rss = newHello->rss;
+			parent.dist_to_server = newHello->dist_to_server;
+			parent.valid = true;
+			me.dist_to_server = parent.dist_to_server +1 ;
+			printf("Parent: %d.%d - new_dist: %d \n", parent.addr.u8[0], parent.addr.u8[1], me.dist_to_server);
+			
+			//send childConfirmation to parent
+			struct RUNICAST_ROUTING sendPacket;
+			sendPacket.addr = me.addr;
+			sendPacket.isChild = true;
+			
+			/* OPTIONAL: Sender history */
+			list_init(history_table);
+			memb_init(&history_mem); 
+			
+			while(runicast_is_transmitting(&runicast_routing_conn)){}
+			packetbuf_clear();
+			packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
+			runicast_send(&runicast_routing_conn, &parent.addr, MAX_RETRANSMISSIONS);
+			
+			// Starting data process
+			process_start(&runicast_data_process, NULL);
+			// Starting recv lost process
+			//process_start(&recv_lost_process, NULL);
+			
+			printf("Exiting recv hello process \n");
+			PROCESS_EXIT();
+		}
+	}
 	
 	PROCESS_END()
 }
 
+PROCESS_THREAD(recv_lost_process, ev, data){
+	PROCESS_EXITHANDLER(broadcast_close(&broadcast_lost_conn);)
+	PROCESS_BEGIN();
+	printf("Process recv lost started \n");
+	
+	//broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);
+	
+	
+	PROCESS_WAIT_EVENT_UNTIL(1);
+	while(1){
+		PROCESS_WAIT_EVENT_UNTIL(0);
+	}
+	
+	PROCESS_END()
+}
+
+
+/* GLOBAL PROCESS */
 PROCESS_THREAD(sensor_node_process, ev, data){
 	// Init me node
 	me.addr = linkaddr_node_addr;
@@ -429,7 +593,6 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_lost_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_lost_conn);)
-	PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
 	
 	PROCESS_BEGIN(); 
@@ -438,81 +601,70 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 	resetParent();
 	
 	// Open connexions
-	broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);
+	//broadcast_open(&broadcast_lost_conn, 139, &broadcast_lost_callbacks);
 	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
 	runicast_open(&runicast_lost_conn, 154, &runicast_lost_callbacks);
-	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
 	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
-		
+
 	PROCESS_END();
 }
 
+/* DATA PROCESS */
+// Send data to parent every 60sec
 PROCESS_THREAD(runicast_data_process, ev, data) {
+	PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn););
+	PROCESS_BEGIN(); 
 
-  PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn););
-  PROCESS_BEGIN(); 
-
-  printf("RUNICAST STARTED\n");
-
-
-  //Cette partie est utilisée pour runicast mais j'ai pas encore compris à quoi elle pouvait servir
-  /* OPTIONAL: Sender history */
-  list_init(history_table);
-  memb_init(&history_mem); 
-  
-   //we turn on all the leds, turning on the leds means starting generation of fake data
-   leds_on(LEDS_ALL);
-
-  while (1) {
-
-       //if we have to open the valve for 10 minutes coming from a statement from the computational node, we exit this process so we don't send value anymore to computational node
-       //this runicast activity will be resumed by the openValve process as soon as the 10 minutes delay will be done
-       //we make sure we turn off all the leds before
-	   /*
-      if(toToggle ==  true){
-        PROCESS_EXIT();
-      }
-	   * */
-
-      struct RUNICAST_DATA sendPacket;
-      sendPacket = generate_random_data(sendPacket);
-	  sendPacket.forwarded = false; //peut être à enlevé car elle va crée des complications non?
-	  sendPacket.addr= me.addr;
-
-	   //the clock is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
-      clock_s++;
-	  if(clock_s == 31){
-        clock_s = 1;
-      }
-
-     /*--------------timer handling section----------------*/ 
+	printf("RUNICAST DATA STARTED\n");
 	
-    static struct etimer etRunicast;
-    etimer_set(&etRunicast,CLOCK_SECOND); //timer d'une seconde
+	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
+
+	/* OPTIONAL: Sender history */
+	list_init(history_table);
+	memb_init(&history_mem); 
+  
+	//we turn on all the leds, turning on the leds means starting generation of fake data
+	leds_on(LEDS_ALL);
+
+	while (1) {
+		//if we have to open the valve for 10 minutes coming from a statement from the computational node, we exit this process so we don't send value anymore to computational node
+		//this runicast activity will be resumed by the openValve process as soon as the 10 minutes delay will be done
+		//we make sure we turn off all the leds before
+		/*
+		if(toToggle ==  true){
+			PROCESS_EXIT(); // Change with process_exit() from another process
+		}
+		*/
+	   
+		static struct etimer etRunicast;
+		etimer_set(&etRunicast,60*CLOCK_SECOND);
     
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
-    //as soon as the time has expired, we can turn off the leds, that means we have finished the sampling
-    leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
+		//Turn LED's OFF
+		leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+	
+		struct RUNICAST_DATA sendPacket1;
+		struct RUNICAST_DATA sendPacket = generate_random_data(sendPacket1);
+		sendPacket.forwarded = false; //peut être à enlevé car elle va crée des complications non?
+		sendPacket.addr = me.addr;
 
+		//the clock is used to tell to the receiver to which time corresponds the sensor value it receives, it has to be under generate random data in order to begin at 1
+		clock_s++;
+		if(clock_s == 31){
+			clock_s = 1;
+		}
 
-   if(!runicast_is_transmitting(&runicast_data_conn)) {
-      linkaddr_t recv;
+		while(runicast_is_transmitting(&runicast_data_conn)){}
+		linkaddr_t recv;
+		packetbuf_clear();
+		packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
+		recv.u8[0] = parent.addr.u8[0];
+		recv.u8[1] = parent.addr.u8[1];
+		
+		printf("Sending runicast to address %u.%u\n",recv.u8[0],recv.u8[1]);
 
-      packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
-      recv.u8[0] = parent.addr.u8[0];
-      recv.u8[1] = parent.addr.u8[1];
+		runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS);
+	}
 
-      printf("%u.%u: sending runicast to address %u.%u\n",
-	     linkaddr_node_addr.u8[0],
-	     linkaddr_node_addr.u8[1],
-	     recv.u8[0],
-	     recv.u8[1]);
-
-      runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS);
-    }
-
-   /*------end of section for runicast message sending-----*/
-  }
-
-PROCESS_END();
+	PROCESS_END();
 }

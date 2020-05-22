@@ -424,7 +424,7 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 	static struct etimer hello_timer;
 	while(1){
 		if(me.dist_to_server != INT_MAX){
-			etimer_set(&hello_timer, 120*CLOCK_SECOND);
+			etimer_set(&hello_timer, 120*CLOCK_SECOND + (random_rand() % 20*CLOCK_SECOND) );
 			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&hello_timer));
 			
 			struct BROADCAST_ROUTING broadcast_routing_packet;
@@ -452,7 +452,7 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 	while(1){
 		// Timer init
 		static struct etimer allow_recv;
-		etimer_set(&allow_recv, 250*CLOCK_SECOND);
+		etimer_set(&allow_recv, 240*CLOCK_SECOND + (random_rand() % 30*CLOCK_SECOND) );
 		
 		// Allow receive hello message
 		headHello = NULL;
@@ -544,6 +544,11 @@ PROCESS_THREAD(sensor_node_process, ev, data){
 PROCESS_THREAD(runicast_data_process, ev, data) {
 	PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn););
 	PROCESS_BEGIN(); 
+	
+	// Init time shifting
+	static struct etimer startTimer;
+	etimer_set(&startTimer, (random_rand() % 30*CLOCK_SECOND));
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&startTimer)); 
 
 	printf("RUNICAST DATA STARTED\n");
 	

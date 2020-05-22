@@ -215,6 +215,7 @@ static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from
 
 static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast action timeout \n");
+	//TODO Delete child
 }
 
 // Received routing runicast
@@ -235,7 +236,10 @@ static void sent_runicast_routing(struct runicast_conn *c, const linkaddr_t *fro
 
 static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
 	printf("Runicast routing timeout \n");
-	//TODO change parent
+	
+	process_exit(&runicast_data_process);
+	resetParent();
+	process_start(&recv_hello_process, NULL);
 }
 
 

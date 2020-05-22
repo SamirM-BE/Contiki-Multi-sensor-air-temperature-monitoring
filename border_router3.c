@@ -113,7 +113,6 @@ static struct broadcast_conn broadcast_lost_conn;
 
 
 static void resetParent(){
-	printf("SAMIR: resetParent : \n");
 	parent.addr.u8[0] = 0;
 	parent.addr.u8[1] = 0;
 	parent.rss = INT_MIN;
@@ -124,7 +123,6 @@ static void resetParent(){
 
 // the values of the sensor
 static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	printf("SAMIR: recv_runicast_data : \n");
 	 /* OPTIONAL: Sender history */
 	  struct history_entry *e = NULL;
 	  for(e = list_head(history_table); e != NULL; e = e->next) {
@@ -160,7 +158,6 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	int val = packet->val;
 	int min = packet->min;
 	bool forwarded = packet->forwarded;
-	printf("SAMIR: step6, packet recu, min: %d \n", packet->min);
 	printf("DATA: %d.%d, %d, %d\n", packet->addr.u8[0], packet->addr.u8[1], min, val);
    
 	//we update the timestamp of our child
@@ -179,7 +176,7 @@ static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from
 }
 
 static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
-	printf("Runicast action sent \n");
+	printf("Runicast action sent\n");
 }
 
 static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
@@ -188,7 +185,6 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 
 // Received routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	printf("SAMIR: recv_runicast_routing : \n");
 	printf("Child info received ! \n");
 
 	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
@@ -202,7 +198,6 @@ static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *fro
 
 // the hello message we received in broadcast
 static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * from) {
-	printf("SAMIR: broadcast_routing_recv : \n");
 	if(allow_recv_hello){ // equivalent to say that the node does not have parent yet and just spawned in an existing network        
         printf("add addr to linked list \n");
 		int rss;
@@ -232,7 +227,6 @@ static const struct runicast_callbacks runicast_action_callbacks = {recv_runicas
 
 
 PROCESS_THREAD(broadcast_routing_process, ev, data){
-	printf("SAMIR: broadcast_routing_process : \n");
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
 	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
@@ -279,16 +273,34 @@ PROCESS_THREAD(broadcast_routing_process, ev, data){
 
 PROCESS_THREAD(test_serial, ev, data)
  {
-	 printf("SAMIR: test_serial : \n");
    PROCESS_BEGIN();
 	
    for(;;) {   
      PROCESS_YIELD();
      if(ev == serial_line_event_message) {
        printf("%s\n", (char *)data);
+	   char *tempo = (char *)data;
+	   char a = tempo[0];
+	   char b = tempo[2];
+	   int aa = a - '0';
+	   int bb = b - '0';
+	   //char *eptr;
+	   //double ab = strtod(data, &eptr);
 	   
-	   if(strcmp((char *) data, "openValve")==0)
-		   printf("OUVERTURE DES VALVES !!!\n");
+	   
+	   struct Child *tmp = headChild;
+	   while(tmp!=NULL)
+	   {
+		   linkaddr_t currentAddr = tmp->addr;
+		   struct RUNICAST_ACTION openValveMsg;
+		   openValveMsg.dest_addr.u8[0] = aa;
+		   openValveMsg.dest_addr.u8[1] = bb;
+		   openValveMsg.openValve = true;
+		   packetbuf_clear();
+		   packetbuf_copyfrom(&openValveMsg, sizeof(openValveMsg));
+		   runicast_send(&runicast_action_conn, &currentAddr, MAX_RETRANSMISSIONS);
+		   tmp = tmp->next;
+	   }
      }
    }
    PROCESS_END();

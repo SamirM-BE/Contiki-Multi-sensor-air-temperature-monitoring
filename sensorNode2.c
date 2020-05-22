@@ -15,7 +15,7 @@
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #define MAX_RETRANSMISSIONS 10 //for runicast
-#define NUM_HISTORY_ENTRIES 10 //for runicast
+#define NUM_HISTORY_ENTRIES 10 //for runicas
 
 /* ------ PROCESSES DEFINITION ------ */
 
@@ -31,7 +31,6 @@ AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
 
 //TODO gérer process children alive
 
-/* ------ RUNICAST STRUCTURE FOR DUPLICATES ----- */
 struct history_entry {
   struct history_entry *next;
   linkaddr_t addr;
@@ -142,34 +141,34 @@ static void resetParent(){
 
 // the values of the sensor
 static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	/* OPTIONAL: Sender history */
-	struct history_entry *e = NULL;
-	for(e = list_head(history_table); e != NULL; e = e->next) {
+	 /* OPTIONAL: Sender history */
+	  struct history_entry *e = NULL;
+	  for(e = list_head(history_table); e != NULL; e = e->next) {
 		if(linkaddr_cmp(&e->addr, from)) {
-			break;
+		  break;
 		}
-	}
-	if(e == NULL) {
+	  }
+	  if(e == NULL) {
 		/* Create new history entry */
 		e = memb_alloc(&history_mem);
 		if(e == NULL) {
-			e = list_chop(history_table); /* Remove oldest at full history */
+		  e = list_chop(history_table); /* Remove oldest at full history */
 		}
 		linkaddr_copy(&e->addr, from);
 		e->seq = seqno;
 		list_push(history_table, e);
-	} 
-	else {
+	  } else {
 		/* Detect duplicate callback */
 		if(e->seq == seqno) {
-			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
-			return;
+		  printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n",
+			 from->u8[0], from->u8[1], seqno);
+		  return;
 		}
 		/* Update existing history entry */
 		e->seq = seqno;
-	}
+	  }
 	//TODO when duplicates - this section is never reached ... 
-	printf("RECIVED RUNICAST DATA\n");
+	printf("RECIVED RUNICAST DATA from %d.%d seq: %d\n",  from->u8[0], from->u8[1], seqno);
 	//tu récup le paquet, tu modifies le champs, 
 	//on set le le boolean forwarded à true
 }
@@ -189,32 +188,7 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
  
 // the action to open the valve for 10 minutes coming from the computational node or the server
 static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	/* OPTIONAL: Sender history */
-	struct history_entry *e = NULL;
-	for(e = list_head(history_table); e != NULL; e = e->next) {
-		if(linkaddr_cmp(&e->addr, from)) {
-			break;
-		}
-	}
-	if(e == NULL) {
-		/* Create new history entry */
-		e = memb_alloc(&history_mem);
-		if(e == NULL) {
-			e = list_chop(history_table); /* Remove oldest at full history */
-		}
-		linkaddr_copy(&e->addr, from);
-		e->seq = seqno;
-		list_push(history_table, e);
-	} 
-	else {
-		/* Detect duplicate callback */
-		if(e->seq == seqno) {
-			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
-			return;
-		}
-		/* Update existing history entry */
-		e->seq = seqno;
-	}
+	
 }
 
 static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -227,33 +201,6 @@ static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *f
 
 // Received routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	/* OPTIONAL: Sender history */
-	struct history_entry *e = NULL;
-	for(e = list_head(history_table); e != NULL; e = e->next) {
-		if(linkaddr_cmp(&e->addr, from)) {
-			break;
-		}
-	}
-	if(e == NULL) {
-		/* Create new history entry */
-		e = memb_alloc(&history_mem);
-		if(e == NULL) {
-			e = list_chop(history_table); /* Remove oldest at full history */
-		}
-		linkaddr_copy(&e->addr, from);
-		e->seq = seqno;
-		list_push(history_table, e);
-	} 
-	else {
-		/* Detect duplicate callback */
-		if(e->seq == seqno) {
-			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
-			return;
-		}
-		/* Update existing history entry */
-		e->seq = seqno;
-	}
-	
 	printf("Child info received ! \n");
 
 	struct RUNICAST_ROUTING *packet = packetbuf_dataptr();
@@ -275,33 +222,6 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 
 // Receivred lost runicast
 static void recv_runicast_lost(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	/* OPTIONAL: Sender history */
-	struct history_entry *e = NULL;
-	for(e = list_head(history_table); e != NULL; e = e->next) {
-		if(linkaddr_cmp(&e->addr, from)) {
-			break;
-		}
-	}
-	if(e == NULL) {
-		/* Create new history entry */
-		e = memb_alloc(&history_mem);
-		if(e == NULL) {
-			e = list_chop(history_table); /* Remove oldest at full history */
-		}
-		linkaddr_copy(&e->addr, from);
-		e->seq = seqno;
-		list_push(history_table, e);
-	} 
-	else {
-		/* Detect duplicate callback */
-		if(e->seq == seqno) {
-			printf("runicast message received from %d.%d, seqno %d (DUPLICATE)\n", from->u8[0], from->u8[1], seqno);
-			return;
-		}
-		/* Update existing history entry */
-		e->seq = seqno;
-	}
-	
 	printf("Runicast lost received \n");
 	if(allow_recv_lost){
 		struct RUNICAST_LOST *packet = packetbuf_dataptr();
@@ -351,10 +271,6 @@ static void broadcast_lost_recv(struct broadcast_conn * c,const linkaddr_t * fro
 		struct RUNICAST_LOST sendPacket;
 		sendPacket.addr = me.addr;
 		sendPacket.dist_to_server = me.dist_to_server;
-		
-		/* OPTIONAL: Sender history */
-		list_init(history_table);
-		memb_init(&history_mem); 
 		
 		// Sending lost runicast with our dist_to_server
 		while(runicast_is_transmitting(&runicast_lost_conn)){}
@@ -453,9 +369,6 @@ PROCESS_THREAD(broadcast_lost_process, ev, data){
 			sendPacketChild.addr = me.addr;
 			sendPacketChild.isChild = true;
 			
-			/* OPTIONAL: Sender history */
-			list_init(history_table);
-			memb_init(&history_mem); 
 			
 			while(runicast_is_transmitting(&runicast_routing_conn)){}
 			packetbuf_clear();
@@ -540,10 +453,6 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 			sendPacket.addr = me.addr;
 			sendPacket.isChild = true;
 			
-			/* OPTIONAL: Sender history */
-			list_init(history_table);
-			memb_init(&history_mem); 
-			
 			while(runicast_is_transmitting(&runicast_routing_conn)){}
 			packetbuf_clear();
 			packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
@@ -552,7 +461,7 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 			// Starting data process
 			process_start(&runicast_data_process, NULL);
 			// Starting recv lost process
-			//process_start(&recv_lost_process, NULL);
+			process_start(&recv_lost_process, NULL);
 			
 			printf("Exiting recv hello process \n");
 			PROCESS_EXIT();
@@ -618,10 +527,6 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 	printf("RUNICAST DATA STARTED\n");
 	
 	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
-
-	/* OPTIONAL: Sender history */
-	list_init(history_table);
-	memb_init(&history_mem); 
   
 	//we turn on all the leds, turning on the leds means starting generation of fake data
 	leds_on(LEDS_ALL);
@@ -655,6 +560,9 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		}
 
 		while(runicast_is_transmitting(&runicast_data_conn)){}
+		/* OPTIONAL: Sender history */
+		list_init(history_table);
+		memb_init(&history_mem);
 		linkaddr_t recv;
 		packetbuf_clear();
 		packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));

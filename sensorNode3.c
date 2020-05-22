@@ -125,6 +125,7 @@ static struct RUNICAST_DATA generate_random_data(struct RUNICAST_DATA sendPacket
 	sendPacket.min = clock_s;
 	sendPacket.val = proposal_value;
 	return sendPacket;
+	printf("SAMIR: step1, min: %d \n", sendPacket.min);
 }
 
 static void resetParent(){
@@ -168,13 +169,14 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	printf("RECIVED RUNICAST DATA from %d.%d seq: %d\n",  from->u8[0], from->u8[1], seqno);
 	
 	struct RUNICAST_DATA *packet = packetbuf_dataptr();
-   
+	printf("SAMIR: step4, packet recu0, min: %d \n", packet->min);
 	//we update the timestamp of our child
-	const linkaddr_t ch = packet -> addr;
-	headChild = update(headChild, ch, clock_seconds());
+	//const linkaddr_t ch = packet->addr;
+	//headChild = update(headChild, ch, clock_seconds());
 	
 	//as we are a sensor node, we have to set the forwarded boolean to true
-	packet->forwarded = true;
+	//packet->forwarded = true;
+	//printf("r.s: packet forwared is equal to: %d\n",packet->forwarded);
 	
 	linkaddr_t recv;
 	recv.u8[0] = parent.addr.u8[0];
@@ -186,10 +188,10 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	// then we send the packet
 	//while(runicast_is_transmitting(&runicast_data_conn)){}
 	packetbuf_clear();
-	packetbuf_copyfrom(packet, sizeof(packet));
-	printf("Message form %d:%d forwareded to %d:%d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
+	packetbuf_copyfrom(packet, sizeof(struct RUNICAST_DATA));
+	printf("Message form %d:%d forwareded to %d:%d, min: %d, temperature: %d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1], packet->min, packet->val);
 	runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS); //the second argument is the address of our parent wich is our parent
-
+	printf("SAMIR: step5, packet envoye1  \n");
 }
 
 static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
@@ -446,7 +448,9 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
 	
 		struct RUNICAST_DATA sendPacket1;
+		printf("SAMIR: step0\n");
 		struct RUNICAST_DATA sendPacket = generate_random_data(sendPacket1);
+		printf("SAMIR: step2, min: %d \n", sendPacket.min);
 		sendPacket.forwarded = false; //peut être à enlevé car elle va crée des complications non?
 		sendPacket.addr = me.addr;
 
@@ -462,11 +466,11 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		memb_init(&history_mem);
 		
 		packetbuf_clear();
-		packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
-		
+		packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
 		printf("Sending runicast to address %u.%u\n",parent.addr.u8[0],parent.addr.u8[1]);
 
 		runicast_send(&runicast_data_conn, &parent.addr, MAX_RETRANSMISSIONS);
+		printf("SAMIR: step3, packet envoye0 \n");
 	}
 
 	PROCESS_END();

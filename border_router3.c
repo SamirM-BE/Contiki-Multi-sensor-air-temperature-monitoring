@@ -291,8 +291,11 @@ PROCESS_THREAD(test_serial, ev, data)
 	   struct Child *tmp = headChild;
 	   while(tmp!=NULL)
 	   {
+		   printf("DJAF: dans le while\n");
 		   linkaddr_t currentAddr = tmp->addr;
+		   printf("DJAF : currentAddr.a: %d, currentAddr.b: %d\n",currentAddr.u8[0], currentAddr.u8[1]);
 		   struct RUNICAST_ACTION openValveMsg;
+		   printf("DJAF: aa: %d, bb: %d \n",aa, bb);
 		   openValveMsg.dest_addr.u8[0] = aa;
 		   openValveMsg.dest_addr.u8[1] = bb;
 		   openValveMsg.openValve = true;
@@ -300,7 +303,9 @@ PROCESS_THREAD(test_serial, ev, data)
 		   packetbuf_copyfrom(&openValveMsg, sizeof(openValveMsg));
 		   runicast_send(&runicast_action_conn, &currentAddr, MAX_RETRANSMISSIONS);
 		   tmp = tmp->next;
+		   printf("DJAF: fin du tour while\n");
 	   }
+	   printf("DJAF: en dehors du while\n");
      }
    }
    PROCESS_END();

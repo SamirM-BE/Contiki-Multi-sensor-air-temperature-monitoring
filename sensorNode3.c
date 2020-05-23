@@ -205,8 +205,35 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
  
 // the action to open the valve for 10 minutes coming from the computational node or the server
 static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+		 /* OPTIONAL: Sender history */
+	  struct history_entry *e = NULL;
+	  for(e = list_head(history_table); e != NULL; e = e->next) {
+		if(linkaddr_cmp(&e->addr, from)) {
+		  break;
+		}
+	  }
+	  if(e == NULL) {
+		/* Create new history entry */
+		e = memb_alloc(&history_mem);
+		if(e == NULL) {
+		  e = list_chop(history_table); /* Remove oldest at full history */
+		}
+		linkaddr_copy(&e->addr, from);
+		e->seq = seqno;
+		list_push(history_table, e);
+	  } else {
+		/* Detect duplicate callback */
+		if(e->seq == seqno) {
+		  printf("runicast ACTION message received from %d.%d, seqno %d (DUPLICATE)\n",
+			 from->u8[0], from->u8[1], seqno);
+		  return;
+		}
+		/* Update existing history entry */
+		e->seq = seqno;
+	  }
 	printf("Runicast action received !! ORDER TO OPEN VALVE \n");
-	
+	struct RUNICAST_ACTION *packet = packetbuf_dataptr();
+	printf("DJAF: paquet recu pour a:%d, b:%d\n",packet->dest_addr.u8[0], packet->dest_addr.u8[1]);
 }
 
 static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){

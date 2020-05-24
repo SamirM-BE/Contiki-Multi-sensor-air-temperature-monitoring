@@ -14,17 +14,16 @@
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 #include "dev/serial-line.h"
+
 #define MAX_RETRANSMISSIONS 10 //for runicast
 #define NUM_HISTORY_ENTRIES 10 //for runicas
 
 /* ------ PROCESSES DEFINITION ------ */
 
+PROCESS(border_router_process, "border router process");
 PROCESS(broadcast_routing_process, "routing broadcast");
-PROCESS(test_serial, "Serial line test process");
-PROCESS(action_process, "action process");
-AUTOSTART_PROCESSES(&broadcast_routing_process, &test_serial);
-
-//TODO gérer process children alive
+PROCESS(server_comm_process, "Server communication process");
+AUTOSTART_PROCESSES(&border_router_process, &broadcast_routing_process);
 
 struct history_entry {
   struct history_entry *next;
@@ -34,16 +33,6 @@ struct history_entry {
 LIST(history_table);
 MEMB(history_mem, struct history_entry, NUM_HISTORY_ENTRIES);
 
-// message sent when a node lost his parent
-struct BROADCAST_LOST {
-	linkaddr_t addr;
-};
-
-//answer of a new potential node for lonely child :'(
-struct RUNICAST_LOST {
-	linkaddr_t addr;
-	int dist_to_server;
-};
 
 // the hello message sent regularly
 struct BROADCAST_ROUTING {
@@ -57,6 +46,11 @@ struct RUNICAST_ROUTING {
 	bool isChild;
 };
 
+struct RUNICAST_ACTION {
+	linkaddr_t dest_addr;
+	bool openValve;
+};
+
 // when a sensor node wants to send his data every minute to a computational node
 struct RUNICAST_DATA {
 	linkaddr_t addr;
@@ -65,8 +59,10 @@ struct RUNICAST_DATA {
 	int val;
 };
 
+// sent by the server or the computational node to tell the sensor node to open his valve
 struct BROADCAST_ACTION {
 	linkaddr_t dest_addr;
+	bool openValve;
 	int dist_to_server;
 };
 
@@ -88,16 +84,17 @@ struct Node
 
 /* ----- STATIC VARIABLES -------- */
 static struct Child *headChild = NULL;
-static struct Hello *headHello = NULL; // List of Hello packet received
 static struct Node me;
 
 static struct runicast_conn runicast_routing_conn;
-static struct runicast_conn runicast_lost_conn;
 static struct runicast_conn runicast_data_conn;
+static struct runicast_conn runicast_action_conn;
 
 static struct broadcast_conn broadcast_routing_conn;
-static struct broadcast_conn broadcast_action_conn;
-static struct broadcast_conn broadcast_lost_conn;
+
+
+/* ----- FUNCTIONS ------ */
+
 
 
 /* ------ CONNEXIONS FUNCTIONS ------ */
@@ -140,14 +137,6 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	int min = packet->min;
 	bool forwarded = packet->forwarded;
 	printf("DATA: %d.%d, %d, %d\n", packet->addr.u8[0], packet->addr.u8[1], min, val);
-   
-	//we update the timestamp of our child
-	//const linkaddr_t ch = packet -> addr;
-	//headChild = update(headChild, ch, clock_seconds());
-	
-	//as we are a sensor node, we have to set the forwarded boolean to true
-
-	printf("packet forwared is equal to: %d\n",forwarded);
 
 }
 
@@ -163,122 +152,136 @@ static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *fro
 	printf("Child %d.%d added \n", packet->addr.u8[0], packet->addr.u8[1]);
 }
 
-static void broadcast_action_recv(struct broadcast_conn * c,const linkaddr_t * from){
-	printf("recevied action broadcast \n");
+// the action to open the valve for 10 minutes coming from the computational node or the server
+static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
+	printf("RUNICAST ACTION RECEIVED ! \n");
 }
+
+static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
+	printf("Runicast action sent \n");
+}
+
+static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
+	printf("Runicast action timeout \n");
+	//TODO Delete child
+}
+
 
 // the hello message we received in broadcast
 static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * from) {
-	printf("Hello message receved, ignored because  I'm border router ! \n");
+	printf("receved hello \n");
 }
 
 /* ------ Static connexion's callbacks ------ */
 
-static const struct broadcast_callbacks broadcast_action_callbacks = {broadcast_action_recv};
 static const struct broadcast_callbacks broadcast_routing_callbacks = {broadcast_routing_recv};
 static const struct runicast_callbacks runicast_routing_callbacks = {recv_runicast_routing};
 static const struct runicast_callbacks runicast_data_callbacks = {recv_runicast_data};
+static const struct runicast_callbacks runicast_action_callbacks = {recv_runicast_action, sent_runicast_action, timeout_runicast_action};
 
 /* -------- PROCESSES ------- */ 
 
-
-
 PROCESS_THREAD(broadcast_routing_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
-	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
 	
 	PROCESS_BEGIN();
 	printf("Broadcast routing begin ! \n");
-	me.addr = linkaddr_node_addr;
-	me.dist_to_server = 1;
-
-	printf("Sensor Node Process runing \n");
-	
-	// Open connexions
-	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
-	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
 	
 	broadcast_open(&broadcast_routing_conn, 129, &broadcast_routing_callbacks);
+	//PROCESS_WAIT_EVENT_UNTIL(1); // Necessary (but we don't understand why)
 	
 	static struct etimer hello_timer;
 	while(1){
-		if(me.dist_to_server != INT_MAX){
-			etimer_set(&hello_timer, 120*CLOCK_SECOND);
-			PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&hello_timer));
+		etimer_set(&hello_timer, 120*CLOCK_SECOND + (random_rand() % 20*CLOCK_SECOND) );
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&hello_timer));
 			
-			struct BROADCAST_ROUTING broadcast_routing_packet;
-			broadcast_routing_packet.addr = me.addr; 
-			broadcast_routing_packet.dist_to_server = me.dist_to_server;
+		struct BROADCAST_ROUTING broadcast_routing_packet;
+		broadcast_routing_packet.addr = me.addr; 
+		broadcast_routing_packet.dist_to_server = me.dist_to_server;
 			
-			packetbuf_clear();
-			packetbuf_copyfrom(&broadcast_routing_packet, sizeof(broadcast_routing_packet));
+		packetbuf_clear();
+		packetbuf_copyfrom(&broadcast_routing_packet, sizeof(broadcast_routing_packet));
 			
-			broadcast_send(&broadcast_routing_conn);
-			printf("Hello message sent \n");
-		}
-		else{
-			PROCESS_WAIT_EVENT_UNTIL(0);
-		}
+		broadcast_send(&broadcast_routing_conn);
+		printf("Hello message sent \n");
 	}
 	
-	PROCESS_END();
+	PROCESS_END()
 }
 
-
-
-
-PROCESS_THREAD(test_serial, ev, data)
- {
-   PROCESS_BEGIN();
+PROCESS_THREAD(border_router_process, ev, data){
+	// Init me node
+	me.addr = linkaddr_node_addr;
+	me.dist_to_server = 1;
 	
-   for(;;) {   
-	   PROCESS_YIELD();
-	   if(ev == serial_line_event_message) {
-		   printf("%s\n", (char *)data);
-		   char *tempo = (char *)data;
-		   char a = tempo[0];
-		   char b = tempo[2];
-		   int aa = a - '0';
-		   int bb = b - '0';
-			
-		   // preparing argument to pass to the process
-		   linkaddr_t dest_add;
-		   dest_add.u8[0] = aa;
-		   dest_add.u8[1] = bb;
-		   process_data_t arg = &dest_add;
-		
-		   // Start action process, sending action
-		   process_start(&action_process, arg);
-	   }
-	   PROCESS_END();
-	}
-}
- 
-PROCESS_THREAD(action_process, ev, data){
-	PROCESS_EXITHANDLER(broadcast_close(&broadcast_action_conn);)
+	// Handling exit connexions
+	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
+	PROCESS_EXITHANDLER(runicast_close(&runicast_data_conn);)
+	//PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
 	
-	// Get address passed in data
-	linkaddr_t *dest_add = data;
-	printf("dst: %d.%d \n", dest_add->u8[0], dest_add->u8[1]);
-	
-	linkaddr_t recv_addr;
-	recv_addr.u8[0] = dest_add->u8[0];
-	recv_addr.u8[1] = dest_add->u8[1];
-
 	PROCESS_BEGIN(); 
-	printf("action process launched ! \n");
+	printf("Border Router Process runing \n");
+		
+	// Open connexions
+	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
+	runicast_open(&runicast_data_conn, 164, &runicast_data_callbacks);
+	//runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
 	
-	broadcast_open(&broadcast_action_conn, 139, &broadcast_routing_callbacks);
-	
-	struct BROADCAST_ACTION *packet = malloc(sizeof(struct BROADCAST_ACTION));
-	packet->dest_addr = recv_addr; 
-	packet->dist_to_server = me.dist_to_server;
-			
-	packetbuf_clear();
-	packetbuf_copyfrom(packet, sizeof(struct BROADCAST_ACTION));
-			
-	broadcast_send(&broadcast_action_conn);
 
-	PROCESS_EXIT();
+	// Start any needed process
+	process_start(&server_comm_process, NULL);
+	
+	PROCESS_WAIT_EVENT_UNTIL(0);
 	PROCESS_END();
 }
+
+PROCESS_THREAD(server_comm_process, ev, data){
+	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
+	PROCESS_BEGIN();
+   
+	printf("Server comm process started ! \n");
+	
+	//PROCESS_WAIT_EVENT_UNTIL(1); 
+	printf("br open conn \n");
+	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
+	
+	
+	static struct etimer testtimer;
+	while(1) {   
+		//PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message && data != NULL);
+		etimer_set(&testtimer, 30*CLOCK_SECOND);
+		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&testtimer));
+		//printf("%s\n", (char *)data);
+		//char *tempo = (char *)data;
+		//char a = tempo[0];
+		//char b = tempo[2];
+		//int aa = a - '0';
+		//int bb = b - '0';
+		int aa = 3;
+		int bb = 0;
+			
+		static struct etimer action_timer;
+		struct Child *current = headChild;
+		while(current != NULL){
+			printf("current: %d.%d \n", current->addr.u8[0], current->addr.u8[1]);
+			struct RUNICAST_ACTION packet;
+			packet.dest_addr.u8[0] = aa;
+			packet.dest_addr.u8[1] = bb;
+			packet.openValve = true;
+				
+			while(runicast_is_transmitting(&runicast_action_conn)){
+				//printf("stuck in loop \n");
+			}
+			packetbuf_clear();
+			packetbuf_copyfrom(&packet, sizeof(packet));
+			runicast_send(&runicast_action_conn, &(current->addr), MAX_RETRANSMISSIONS);
+				
+			printf("border router sent action to child ! \n");
+				
+			current = current->next;
+		}
+	}
+	
+	PROCESS_END();
+ }
+

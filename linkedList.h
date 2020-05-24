@@ -4,27 +4,23 @@
 #include <stdbool.h>
 #include "net/rime/rime.h"
 #include "contiki.h"
-#define MAX_INTERVAL_KEEPALIVE 5
 
  
 
-struct Child
+struct ComputedNode
 {
     linkaddr_t addr;
     unsigned long timestamp;
-    struct Child* next;
+    struct ComputedNode* next;
 };
 
  
 
 //find a link with given addr, return true if contains and false otherwise
-bool contains(struct Child* head, const linkaddr_t addr) {
-
- 
-
+bool containsComputedNode(struct ComputedNode* head, const linkaddr_t addr) {
 
    //start from the first link
-   struct Child* current = head;
+   struct ComputedNode* current = head;
 
  
 
@@ -35,15 +31,9 @@ bool contains(struct Child* head, const linkaddr_t addr) {
    
    //printf("val de curr %d:%d and val de head %d:%d\n", head->addr.u8[0],head->addr.u8[1], addr.u8[0] , addr.u8[1] );
 
- 
-
    //navigate through list
    while(current->addr.u8[0] != addr.u8[0] || current->addr.u8[1] != addr.u8[1]) {
   
-      //printf("RENTRE WHILE\n");
-
- 
-
       //if it is last node
       if(current->next == NULL) {
          return false;
@@ -60,29 +50,27 @@ bool contains(struct Child* head, const linkaddr_t addr) {
  
 
 //insert link at the first location
-struct Child* insert(struct Child* head, linkaddr_t addr, unsigned long timestamp) {
-	//printf("Rentre insert pour %d.%d \n", addr.u8[0], addr.u8[1]);
-
- 
+struct ComputedNode* insertComputedNode(struct ComputedNode* head, linkaddr_t addr, unsigned long timestamp) {
+//printf("Rentre insert\n");
 
     //if the element is already in the list we do not add it again
     //we first need to veryfy if the list contains the address
-    bool test = contains(head, addr);
+    bool test = containsComputedNode(head, addr);
     if(test){
         return head;
     }
     
     //create a child
-    struct Child *child = (struct Child*) malloc(sizeof(struct Child));
-	
+    struct ComputedNode *computedNode = (struct ComputedNode*) malloc(sizeof(struct ComputedNode));
+
  
 
-    child->addr.u8[0] = addr.u8[0];
-    child->addr.u8[1] = addr.u8[1];
-    child->timestamp = timestamp;
+    computedNode->addr.u8[0] = addr.u8[0];
+    computedNode->addr.u8[1] = addr.u8[1];
+    computedNode->timestamp = timestamp;
    
-    child->next = head; //point it to old first node
-    head = child; //point first to new first node
+    computedNode->next = head; //point it to old first node
+    head = computedNode; //point first to new first node
 
  
 
@@ -91,15 +79,15 @@ struct Child* insert(struct Child* head, linkaddr_t addr, unsigned long timestam
 
  
 
-void printList(struct Child* head) {
-   struct Child *ptr = head;
+void printListComputedNode(struct ComputedNode* head) {
+   struct ComputedNode *ptr = head;
    printf("[ ");
 
  
 
    //start from the beginning
    while(ptr != NULL) {
-      printf("\n Child: %d:%d - time: %ld",ptr->addr.u8[0],ptr->addr.u8[1], ptr->timestamp);
+      printf("\n ComputedNode: %d:%d",ptr->addr.u8[0],ptr->addr.u8[1]);
       ptr = ptr->next;
    }
 
@@ -110,13 +98,13 @@ void printList(struct Child* head) {
 
  
 
-struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long timestamp){
+struct ComputedNode* updateComputedNode(struct ComputedNode * head, const linkaddr_t addr, unsigned long timestamp){
     //we first need to veryfy if the list contains the address
-    bool test = contains(head, addr);
+    bool test = containsComputedNode(head, addr);
 
 	if(test ==  true){ //if it correctly contains the element in the list
         //start from the first link
-        struct Child* current = head;
+        struct ComputedNode* current = head;
 
  
 
@@ -139,12 +127,11 @@ struct Child* update(struct Child * head, const linkaddr_t addr, unsigned long t
  
 
 //delete a link with given key
-struct Child* delete(struct Child *head, const linkaddr_t addr) {
+struct ComputedNode* deleteComputedNode(struct ComputedNode *head, const linkaddr_t addr) {
     
-
    //start from the first link
-   struct Child* current = head;
-   struct Child* prev = NULL;
+   struct ComputedNode* current = head;
+   struct ComputedNode* prev = NULL;
    
    //case of linkedlist with one node
    if(current != NULL && current->next == NULL){
@@ -167,8 +154,8 @@ struct Child* delete(struct Child *head, const linkaddr_t addr) {
        }
        
        if(current->addr.u8[0] == addr.u8[0] && current->addr.u8[1] == addr.u8[1]){ // we found it
-           struct Child* one = current; // the struct we'll return;
-           struct Child* follow = current -> next; 
+           struct ComputedNode* one = current; // the struct we'll return;
+           struct ComputedNode* follow = current -> next; 
            current -> next = NULL; 
            free(current);
            current = NULL;
@@ -179,92 +166,28 @@ struct Child* delete(struct Child *head, const linkaddr_t addr) {
        
        prev = current;
        current = current -> next;
-       
    }
    
+   return head;
+   
 }
-
-
-struct Child* deleteOldChild(struct Child *head){
-    struct Child *ptr = head;
-
- 
-
-    //start from the beginning
-    while(ptr != NULL) {
-        unsigned long interval = clock_seconds() - ptr->timestamp;
-        if(interval > MAX_INTERVAL_KEEPALIVE){
-            //Child seems probably down - remove from list
-            printf("Delete Child %d.%d \n", ptr->addr.u8[0], ptr->addr.u8[1]);
-            struct Child *newHead = delete(head, ptr->addr);
-            return deleteOldChild(newHead);
-        }
-        if(ptr->next == NULL){
-            return head;
-        }
-        else{
-            ptr = ptr->next;
-        }
-    }
-
- 
-
-}
-
-
-/* 
-struct Child* deleteOldChild(struct Child *head){
-    struct Child *ptr = head;
-    struct Child *newHead = NULL;
-
- 
-
-    //start from the beginning
-    while(ptr != NULL) {
-        unsigned long interval = clock_seconds() - ptr->timestamp;
-        if(interval > MAX_INTERVAL_KEEPALIVE){
-            //Child seems probably down - remove from list
-            printf("Delete Child %d.%d \n", ptr->addr.u8[0], ptr->addr.u8[1]);
-            newHead = delete(head, ptr->addr);
-            //return newHead;
-        }
-        
-        /*
-        if(ptr->next == NULL){
-            return head;
-        }
-        else{
-            ptr = ptr->next;
-        }
-         
-        
-    }
-    
-    return newHead;
-}
-*/
-
  
 
 //is list empty
-bool isEmpty(struct Child* head) {
+bool isEmptyComputedNode(struct ComputedNode* head) {
    return head == NULL;
 }
 
  
 
 //return the length of the linked list
-int length(struct Child* head) {
+int lengthComputedNode(struct ComputedNode* head) {
    int length = 0;
-   struct Child *current;
-
- 
+   struct ComputedNode *current;
 
    for(current = head; current != NULL; current = current->next) {
       length++;
    }
-
- 
 
    return length;
 }

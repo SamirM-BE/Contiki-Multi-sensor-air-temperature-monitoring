@@ -80,10 +80,11 @@ def leastSquare(minutes, temperatures):
 
     a = (n * sumyx - sumx * sumy) / (n * sumx2 - sumx * sumx)
     print('SLOPE IS EQUAL TO: ', a)
-    if a > treshold:
-        return 1
-    else:
-        return 0
+    return 1
+    #if a > treshold:
+    #    return 1
+    #else:
+    #    return 0
 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

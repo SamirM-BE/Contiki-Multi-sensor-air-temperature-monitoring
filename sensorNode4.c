@@ -219,20 +219,17 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 
 static void broadcast_action_recv(struct broadcast_conn * c, const linkaddr_t * from){	
 	struct BROADCAST_ACTION *packet = (struct BROADCAST_ACTION*) packetbuf_dataptr();
-	printf("ACTION RCV from %d.%d, to %d.%d\n", from->u8[0], from->u8[1], packet->dest_addr.u8[0], packet->dest_addr.u8[1]);
 	
-		printf("dist packet: %d me: %d \n",packet->dist_to_server, me.dist_to_server);
 		if(packet->dist_to_server < me.dist_to_server){
 			if(linkaddr_cmp(&packet->dest_addr, &me.addr) != 0 ){
-				printf("ADDRESED TO ME \n");
+				printf("I need to open my valve \n");
 				if(process_is_running(&openValve_process) == 0){
-					printf("ABOUT to toggle \n");
 					toToggle = 1;
 					process_start(&openValve_process, NULL);
 				}
 			}
 			else{
-				printf("dist min received -> transfer \n");
+				printf("action received and transfered \n");
 				packet->dist_to_server = me.dist_to_server;
 				packetbuf_clear();
 				packetbuf_copyfrom(packet, sizeof(struct BROADCAST_ACTION));

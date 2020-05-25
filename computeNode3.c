@@ -24,6 +24,7 @@
 
 PROCESS(compute_node_process, "compute node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
+PROCESS(action_process, "action process");
 PROCESS(recv_hello_process, "recv hello process");
 PROCESS(runicast_data_process, "send runicast data");
 AUTOSTART_PROCESSES(&compute_node_process, &broadcast_routing_process);
@@ -57,9 +58,9 @@ struct RUNICAST_DATA {
 };
 
 // sent by the server or the computational node to tell the sensor node to open his valve
-struct RUNICAST_ACTION {
+struct BROADCAST_ACTION {
 	linkaddr_t dest_addr;
-	bool openValve;
+	int dist_to_server;
 };
 
 struct Parent
@@ -93,8 +94,8 @@ static linkaddr_t addr_table [MAX_COMPUTE] = {{0, 0}};
 
 static struct runicast_conn runicast_routing_conn;
 static struct runicast_conn runicast_data_conn;
-static struct runicast_conn runicast_action_conn;
 
+static struct broadcast_conn broadcast_action_conn;
 static struct broadcast_conn broadcast_routing_conn;
 
 
@@ -254,6 +255,7 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 		
 		headComputedNode = update(headComputedNode, packet->addr, clock_seconds());		
 		compute_table[index] = insertData(compute_table[index], packet->val);
+		printf("newlength : %d \n", lengthData(compute_table[index]));
 		// Table is full of data - compute least square
 		if(lengthData(compute_table[index]) == 30){
 			printf("30 DATA - computation \n");
@@ -263,6 +265,11 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 			if(slope > SLOPE_MIN_TRESHOLD){
 				printf("send Action to child \n");
 				//TODO send action if necessary
+				// preparing argument to pass to the process				
+			    process_data_t arg = &packet->addr;
+			
+			   // Start action process, sending action
+			   process_start(&action_process, arg);
 			}
 			
 			// Reset compute_table_value for this address
@@ -283,20 +290,7 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
 	resetParent();
 	process_start(&recv_hello_process, NULL); 
 }
- 
-// the action to open the valve for 10 minutes coming from the computational node or the server
-static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	
-}
 
-static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
-	printf("Runicast action sent \n");
-}
-
-static void timeout_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
-	printf("Runicast action timeout \n");
-	//TODO Delete child
-}
 
 // Received routing runicast
 static void recv_runicast_routing(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
@@ -320,6 +314,9 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 	process_exit(&runicast_data_process);
 	resetParent();
 	process_start(&recv_hello_process, NULL);
+}
+
+static void broadcast_action_recv(struct broadcast_conn * c, const linkaddr_t * from){
 }
 
 
@@ -347,7 +344,8 @@ static void broadcast_routing_recv(struct broadcast_conn * c,const linkaddr_t * 
 static const struct broadcast_callbacks broadcast_routing_callbacks = {broadcast_routing_recv};
 static const struct runicast_callbacks runicast_routing_callbacks = {recv_runicast_routing, sent_runicast_routing, timeout_runicast_routing};
 static const struct runicast_callbacks runicast_data_callbacks = {recv_runicast_data, sent_runicast_data, timeout_runicast_data};
-static const struct runicast_callbacks runicast_action_callbacks = {recv_runicast_action, sent_runicast_action, timeout_runicast_action};
+static const struct broadcast_callbacks broadcast_action_callbacks = {broadcast_action_recv};
+
 
 /* -------- PROCESSES ------- */ 
 
@@ -447,7 +445,6 @@ PROCESS_THREAD(compute_node_process, ev, data){
 	
 	// Handling exit connexions
 	PROCESS_EXITHANDLER(runicast_close(&runicast_routing_conn);)
-	PROCESS_EXITHANDLER(runicast_close(&runicast_action_conn);)
 	//PROCESS_EXITHANDLER(broadcast_close(&broadcast_routing_conn);)
 	
 	PROCESS_BEGIN(); 
@@ -459,7 +456,6 @@ PROCESS_THREAD(compute_node_process, ev, data){
 	// Open connexions
 	//broadcast_open(&broadcast_routing_conn, 129, &broadcast_routing_callbacks);
 	runicast_open(&runicast_routing_conn, 144, &runicast_routing_callbacks);
-	runicast_open(&runicast_action_conn, 174, &runicast_action_callbacks);
 
 	// Allow recv hello message to find parent and dist
 	process_start(&recv_hello_process, NULL); 
@@ -490,5 +486,34 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		headComputedNode = deleteOldComputedNode(headComputedNode);
 	}
 
+	PROCESS_END();
+}
+
+PROCESS_THREAD(action_process, ev, data){
+	PROCESS_EXITHANDLER(broadcast_close(&broadcast_action_conn);)
+	
+	// Get address passed in data
+	linkaddr_t *dest_add = data;
+	printf("dst: %d.%d \n", dest_add->u8[0], dest_add->u8[1]);
+	
+	linkaddr_t recv_addr;
+	recv_addr.u8[0] = dest_add->u8[0];
+	recv_addr.u8[1] = dest_add->u8[1];
+
+	PROCESS_BEGIN(); 
+	printf("action process launched ! \n");
+	
+	broadcast_open(&broadcast_action_conn, 139, &broadcast_routing_callbacks);
+	
+	struct BROADCAST_ACTION *packet = malloc(sizeof(struct BROADCAST_ACTION));
+	packet->dest_addr = recv_addr; 
+	packet->dist_to_server = me.dist_to_server;
+			
+	packetbuf_clear();
+	packetbuf_copyfrom(packet, sizeof(struct BROADCAST_ACTION));
+			
+	broadcast_send(&broadcast_action_conn);
+
+	PROCESS_EXIT();
 	PROCESS_END();
 }

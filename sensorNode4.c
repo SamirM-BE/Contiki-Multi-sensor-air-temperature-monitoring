@@ -154,19 +154,14 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	//TODO handle case where received data but looking for a parent
 	
 	struct RUNICAST_DATA *packet = packetbuf_dataptr();
+   
 	//we update the timestamp of our child
-<<<<<<< HEAD
 	//TODO if forwarded = false
 	const linkaddr_t ch = packet -> addr;
 	headChild = update(headChild, ch, clock_seconds());
-=======
-	//const linkaddr_t ch = packet->addr;
-	//headChild = update(headChild, ch, clock_seconds());
->>>>>>> 1431284df6f083cd137576ada434d065ee6746ef
 	
 	//as we are a sensor node, we have to set the forwarded boolean to true
-	//packet->forwarded = true;
-	//printf("r.s: packet forwared is equal to: %d\n",packet->forwarded);
+	packet->forwarded = true;
 	
 	linkaddr_t recv;
 	recv.u8[0] = parent.addr.u8[0];
@@ -179,12 +174,9 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	//while(runicast_is_transmitting(&runicast_data_conn)){}
 	packetbuf_clear();
 	packetbuf_copyfrom(packet, sizeof(struct RUNICAST_DATA));
-<<<<<<< HEAD
 	printf("Message form %d:%d forwareded to %d:%d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
-=======
-	printf("Message form %d:%d forwareded to %d:%d, min: %d, temperature: %d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1], packet->min, packet->val);
->>>>>>> 1431284df6f083cd137576ada434d065ee6746ef
 	runicast_send(&runicast_data_conn, &recv, MAX_RETRANSMISSIONS); //the second argument is the address of our parent wich is our parent
+
 }
 
 static void sent_runicast_data(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
@@ -199,19 +191,6 @@ static void timeout_runicast_data(struct runicast_conn *c, const linkaddr_t *fro
 	resetParent();
 	process_start(&recv_hello_process, NULL); 
 }
-<<<<<<< HEAD
-=======
- 
-// the action to open the valve for 10 minutes coming from the computational node or the server
-static void recv_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno){
-	printf("Runicast action received !! ORDER TO OPEN VALVE \n");
-	
-}
-
-static void sent_runicast_action(struct runicast_conn *c, const linkaddr_t *from, uint8_t retransmissions){
-	printf("Runicast action sent \n");
-}
->>>>>>> 1431284df6f083cd137576ada434d065ee6746ef
 
 
 // Received routing runicast
@@ -493,7 +472,8 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 		memb_init(&history_mem);
 		
 		packetbuf_clear();
-		packetbuf_copyfrom(&sendPacket, sizeof(sendPacket));
+		packetbuf_copyfrom( &sendPacket, sizeof(sendPacket));
+		
 		printf("Sending runicast to address %u.%u\n",parent.addr.u8[0],parent.addr.u8[1]);
 
 		runicast_send(&runicast_data_conn, &parent.addr, MAX_RETRANSMISSIONS);

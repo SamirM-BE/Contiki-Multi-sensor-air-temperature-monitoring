@@ -1,19 +1,20 @@
 #include "contiki.h"
 #include "net/rime/rime.h"
 #include "dev/leds.h"
-#include <stdio.h> /* For printf() */
-#include <stdlib.h> //for malloc
-#include <stdbool.h> // for boolean
-#include <string.h> // for string operations
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <stdbool.h> 
+#include <string.h>
 #include <limits.h> 
 #include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
-#include "../PROJECT1/mobileP2/linkedListChild.h" // Handle linkedlist
-#include "../PROJECT1/mobileP2/linkedListHello.h" // Handle linkedlist
+#include "../PROJECT1/mobileP2/linkedListChild.h"
+#include "../PROJECT1/mobileP2/linkedListHello.h"
 #include "../PROJECT1/mobileP2/linkedListData.h" 
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
+
 #define MAX_RETRANSMISSIONS 10 //for runicast
 #define NUM_HISTORY_ENTRIES 10 //for runicast
 #define MAX_COMPUTE 5 // Maximum number of node handle by the computation node
@@ -264,7 +265,6 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 			printf("slope: %d \n", slope);
 			if(slope > SLOPE_MIN_TRESHOLD){
 				printf("send Action to child \n");
-				//TODO send action if necessary
 				// preparing argument to pass to the process				
 			    process_data_t arg = &packet->addr;
 			
@@ -317,6 +317,22 @@ static void timeout_runicast_routing(struct runicast_conn *c, const linkaddr_t *
 }
 
 static void broadcast_action_recv(struct broadcast_conn * c, const linkaddr_t * from){
+	struct BROADCAST_ACTION *packet = (struct BROADCAST_ACTION*) packetbuf_dataptr();
+	printf("ACTION RCV from %d.%d, to %d.%d\n", from->u8[0], from->u8[1], packet->dest_addr.u8[0], packet->dest_addr.u8[1]);
+	
+		printf("dist packet: %d me: %d \n",packet->dist_to_server, me.dist_to_server);
+		if(packet->dist_to_server < me.dist_to_server){
+			if(linkaddr_cmp(&packet->dest_addr, &me.addr) != 0 ){
+				printf("ADDRESED TO ME \n");
+			}
+			else{
+				printf("dist min received -> transfer \n");
+				packet->dist_to_server = me.dist_to_server;
+				packetbuf_clear();
+				packetbuf_copyfrom(packet, sizeof(struct BROADCAST_ACTION));
+				broadcast_send(&broadcast_action_conn);
+			}
+		}
 }
 
 

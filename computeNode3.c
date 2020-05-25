@@ -18,13 +18,14 @@
 #define MAX_RETRANSMISSIONS 10 //for runicast
 #define NUM_HISTORY_ENTRIES 10 //for runicast
 #define MAX_COMPUTE 5 // Maximum number of node handle by the computation node
-#define SLOPE_MIN_TRESHOLD 2 // Treshold of least square slope to send openvalve action
+#define SLOPE_MIN_TRESHOLD 0 // Treshold of least square slope to send openvalve action
 #define MAX_KEEPALIVE 2 // Max number of minutes that a child node can stay our child without giving sign of life
 
 /* ------ PROCESSES DEFINITION ------ */
 
 PROCESS(compute_node_process, "compute node process");
 PROCESS(broadcast_routing_process, "routing broadcast");
+PROCESS(recv_action_process, "recv action process");
 PROCESS(action_process, "action process");
 PROCESS(recv_hello_process, "recv hello process");
 PROCESS(runicast_data_process, "send runicast data");
@@ -125,10 +126,11 @@ static int getTabIndex(linkaddr_t *addr){
 // Compute least square of y value on axis from 0 to n-1 
 static int least_square_slope(struct Data* data, int n){
 	int i = 30;
-	int sumx = 0;
-	int sumx2 = 0;
-	int sumy = 0;
-	int sumyx = 0;
+	double sumx = 0;
+	double sumx2 = 0;
+	double sumy = 0;
+	double sumyx = 0;
+	double res = 0;
 	
 	struct Data *ptr = data;
 
@@ -141,10 +143,12 @@ static int least_square_slope(struct Data* data, int n){
 		ptr = ptr->next;
 		i = i - 1;
 	}
-	int res1 = n*sumyx - sumx*sumx;
-	int res2 = n*sumx2 - sumx*sumx;
-
-	return (-res1)/res2;
+	
+	res = (n*sumyx - sumx*sumx) / (n*sumx2 - sumx*sumx);
+	if(res > SLOPE_MIN_TRESHOLD){
+		return 1;
+	}
+	return 0;
 }
 
 struct Child* deleteOldComputedNode(struct Child *head){
@@ -262,8 +266,8 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 			printf("30 DATA - computation \n");
 			
 			int slope = least_square_slope(compute_table[index], 30);
-			printf("slope: %d \n", slope);
-			if(slope > SLOPE_MIN_TRESHOLD){
+			printf("openslope: %d \n", slope);
+			if(slope == 1){
 				printf("send Action to child \n");
 				// preparing argument to pass to the process				
 			    process_data_t arg = &packet->addr;
@@ -444,6 +448,9 @@ PROCESS_THREAD(recv_hello_process, ev, data){
 			// Starting data process
 			process_start(&runicast_data_process, NULL);
 			
+			// Starting recv action process
+			process_start(&recv_action_process, NULL);
+			
 			printf("Exiting recv hello process \n");
 			PROCESS_EXIT();
 		}
@@ -504,6 +511,24 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
 
 	PROCESS_END();
 }
+
+PROCESS_THREAD(recv_action_process, ev, data){
+	PROCESS_EXITHANDLER(broadcast_close(&broadcast_action_conn);)
+	PROCESS_BEGIN(); 
+	
+	printf("recv action porcess started ! \n");
+	
+	//PROCESS_WAIT_EVENT_UNTIL(1);
+	printf("open action conn \n");
+	broadcast_open(&broadcast_action_conn, 139, &broadcast_action_callbacks);
+	
+	printf("wait for action \n");
+	PROCESS_WAIT_EVENT_UNTIL(0);
+	
+	printf("recv action process ended \n");
+	PROCESS_END();
+}
+
 
 PROCESS_THREAD(action_process, ev, data){
 	PROCESS_EXITHANDLER(broadcast_close(&broadcast_action_conn);)

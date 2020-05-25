@@ -83,11 +83,10 @@ static struct Node me;
 static Parent parent;
 static int clock_s = 1; //our clock_s for the minute axis to send to the computational node
 static bool allow_recv_hello = false;
-static bool toToggle = false; //when we received the instruction to toggle the LED
+static int toToggle = 0; //when we received the instruction to toggle the LED
 
 static struct runicast_conn runicast_routing_conn;
 static struct runicast_conn runicast_data_conn;
-//static struct runicast_conn runicast_action_conn;
 
 static struct broadcast_conn broadcast_action_conn;
 static struct broadcast_conn broadcast_routing_conn;
@@ -226,6 +225,11 @@ static void broadcast_action_recv(struct broadcast_conn * c, const linkaddr_t * 
 		if(packet->dist_to_server < me.dist_to_server){
 			if(linkaddr_cmp(&packet->dest_addr, &me.addr) != 0 ){
 				printf("ADDRESED TO ME \n");
+				if(process_is_running(&openValve_process) == 0){
+					printf("ABOUT to toggle \n");
+					toToggle = 1;
+					process_start(&openValve_process, NULL);
+				}
 			}
 			else{
 				printf("dist min received -> transfer \n");
@@ -288,18 +292,14 @@ PROCESS_THREAD(openValve_process, ev, data){
 	
 	
 	static struct etimer etLed;
-	etimer_set(&etLed,600*CLOCK_SECOND); //timer de 50 secondes
-
-	//on étient d'abord toutes les LED
-	//leds_off(LEDS_ALL);
-	//ensuite on les allumes
+	etimer_set(&etLed,600*CLOCK_SECOND); //timer de 60 secondes
 
 	leds_toggle(LEDS_ALL);
 
 	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etLed)); //attend que la seconde expire
 
 	leds_off(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec 
-	//toToggle = 0; //we reset this flag to 0 in order to let the normal toggling process resuming its task
+	toToggle = 0; //we reset this flag to 0 in order to let the normal toggling process resuming its task
 	//process_start(&runicast_process, NULL);
 	// isRunicastStarted = 1; //we don't forget to set the isRunicastStarted variable to 0
 	PROCESS_EXIT();//ensuite on exit le process sinon il va toggle toutes les 5 secondes car le process restera actif pour tjs
@@ -453,7 +453,9 @@ PROCESS_THREAD(runicast_data_process, ev, data) {
     
 		PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&etRunicast)); //attend que la seconde expire
 		//Turn LED's OFF
-		leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec
+		if(toToggle != 1){
+			leds_toggle(LEDS_ALL);//après 5 sec on éteint la led, normalement c'est 10 minutes mais pour test on laisse 5 sec			
+		}
 	
 		struct RUNICAST_DATA sendPacket1;
 		struct RUNICAST_DATA sendPacket = generate_random_data(sendPacket1);

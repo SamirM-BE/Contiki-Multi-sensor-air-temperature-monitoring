@@ -9,9 +9,9 @@
 #include "random.h" // for the generation of fake data sensor
 #include "dev/button-sensor.h"
 #include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
-#include "../mobileP1/linkedListChild.h"
-#include "../mobileP1/linkedListHello.h"
-#include "../mobileP1/linkedListData.h" 
+#include "mobileP1/linkedListChild.h"
+#include "mobileP1/linkedListHello.h"
+#include "mobileP1/linkedListData.h" 
 #include "lib/list.h" //for runicast
 #include "lib/memb.h" //for runicast
 

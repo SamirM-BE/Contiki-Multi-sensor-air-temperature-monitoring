@@ -17,7 +17,7 @@ run
 ```bash
 python3 server.py
 ```
-At this point, you can create any network in Coojan. 
+At this point, you can create any network in Cooja. 
 **To connect to the server, please use the serial socket of the border router as a CLIENT with the port 60001.** 
 
 

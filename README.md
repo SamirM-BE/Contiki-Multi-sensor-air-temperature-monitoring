@@ -5,6 +5,8 @@ This repository contains the source code for the project of Mobile and Embedded 
 @[SamirM-BE](https://github.com/SamirM-BE "SamirM-BE"),  @[Djafa](https://github.com/Djafa "Djafa"), @[olivierperdaens](https://github.com/olivierperdaens "olivierperdaens")
 
 ## How to run?
+
+You have to clone this git **in the root of the contiki folder** for it to work properly.
 ### Install
 the server requires python to run.
 install it with

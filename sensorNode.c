@@ -1,20 +1,20 @@
 #include "contiki.h"
 #include "net/rime/rime.h"
 #include "dev/leds.h"
-#include <stdio.h> /* For printf() */
-#include <stdlib.h> //for malloc
-#include <stdbool.h> // for boolean
-#include <string.h> // for string operations
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <stdbool.h> 
+#include <string.h> 
 #include <limits.h> 
-#include "random.h" // for the generation of fake data sensor
+#include "random.h" // fake data sensors
 #include "dev/button-sensor.h"
-#include "dev/cc2420/cc2420.h" // In order to recognize the variable cc2420_last_rssi
-#include "mobileP1/linkedListChild.h" // Handle linkedlist
-#include "mobileP1/linkedListHello.h" // Handle linkedlist
-#include "lib/list.h" //for runicast
-#include "lib/memb.h" //for runicast
-#define MAX_RETRANSMISSIONS 10 //for runicast
-#define NUM_HISTORY_ENTRIES 10 //for runicas
+#include "dev/cc2420/cc2420.h" // variable cc2420_last_rssi
+#include "mobileP1/linkedListChild.h" 
+#include "mobileP1/linkedListHello.h" 
+#include "lib/list.h" //runicast
+#include "lib/memb.h" //runicast
+#define MAX_RETRANSMISSIONS 10 //runicast
+#define NUM_HISTORY_ENTRIES 10 //runicas
 
 /* ------ PROCESSES DEFINITION ------ */
 
@@ -23,7 +23,7 @@ PROCESS(broadcast_routing_process, "routing broadcast");
 PROCESS(recv_hello_process, "recv hello process");
 PROCESS(runicast_data_process, "send runicast data");
 PROCESS(recv_action_process, "receive action process");
-PROCESS(openValve_process, "open the valve for 10 minutes");
+PROCESS(valve_process, "open the valve for 10 minutes");
 AUTOSTART_PROCESSES(&sensor_node_process, &broadcast_routing_process);
 
 
@@ -150,12 +150,9 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	
 	printf("RECIVED RUNICAST DATA from %d.%d seq: %d\n",  from->u8[0], from->u8[1], seqno);
 	
-	//TODO handle case where received data but looking for a parent
-	
 	struct RUNICAST_DATA *packet = packetbuf_dataptr();
    
 	//we update the timestamp of our child
-	//TODO if forwarded = false
 	const linkaddr_t ch = packet -> addr;
 	headChild = update(headChild, ch, clock_seconds());
 	
@@ -166,11 +163,7 @@ static void recv_runicast_data(struct runicast_conn *c, const linkaddr_t *from, 
 	recv.u8[0] = parent.addr.u8[0];
 	recv.u8[1] = parent.addr.u8[1];
 	
-	//list_init(history_table);
-	//memb_init(&history_mem);
-	
 	// then we send the packet
-	//while(runicast_is_transmitting(&runicast_data_conn)){}
 	packetbuf_clear();
 	packetbuf_copyfrom(packet, sizeof(struct RUNICAST_DATA));
 	printf("Message form %d:%d forwareded to %d:%d\n",from->u8[0], from->u8[1], parent.addr.u8[0], parent.addr.u8[1]);
@@ -223,9 +216,9 @@ static void broadcast_action_recv(struct broadcast_conn * c, const linkaddr_t * 
 		if(packet->dist_to_server < me.dist_to_server){
 			if(linkaddr_cmp(&packet->dest_addr, &me.addr) != 0 ){
 				printf("I need to open my valve \n");
-				if(process_is_running(&openValve_process) == 0){
+				if(process_is_running(&valve_process) == 0){
 					toToggle = 1;
-					process_start(&openValve_process, NULL);
+					process_start(&valve_process, NULL);
 				}
 			}
 			else{
@@ -283,7 +276,7 @@ PROCESS_THREAD(recv_action_process, ev, data){
 	PROCESS_END();
 }
 
-PROCESS_THREAD(openValve_process, ev, data){
+PROCESS_THREAD(valve_process, ev, data){
 	PROCESS_BEGIN(); 
 	printf("OpenValve process launched ! \n");
 	

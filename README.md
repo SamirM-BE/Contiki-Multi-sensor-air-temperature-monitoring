@@ -2,7 +2,7 @@
 This repository contains the source code for the project of Mobile and Embedded computing
 
 #### Contributors :
-@[jefrasa](https://github.com/Jefrasa "jefrasa")
+@[SamirM-BE](https://github.com/SamirM-BE "SamirM-BE"), @[olivierperdaens] (https://github.com/olivierperdaens "olivierperdaens"), @[Djafa](https://github.com/Djafa "Djafa")
 
 ## How to run?
 
